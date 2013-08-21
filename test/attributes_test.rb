@@ -22,8 +22,28 @@ context 'Attributes' do
       assert_equal 'This is the first Ruby implementation of AsciiDoc.', doc.attributes['description']
     end
 
-    test 'deletes an attribute' do
+    test 'should delete an attribute that ends with !' do
       doc = document_from_string(":frog: Tanglefoot\n:frog!:")
+      assert_equal nil, doc.attributes['frog']
+    end
+
+    test 'should delete an attribute that ends with ! set via API' do
+      doc = document_from_string(":frog: Tanglefoot", :attributes => {'frog!' => ''})
+      assert_equal nil, doc.attributes['frog']
+    end
+
+    test 'should delete an attribute that begins with !' do
+      doc = document_from_string(":frog: Tanglefoot\n:!frog:")
+      assert_equal nil, doc.attributes['frog']
+    end
+
+    test 'should delete an attribute that begins with ! set via API' do
+      doc = document_from_string(":frog: Tanglefoot", :attributes => {'!frog' => ''})
+      assert_equal nil, doc.attributes['frog']
+    end
+
+    test 'should delete an attribute set via API to nil value' do
+      doc = document_from_string(":frog: Tanglefoot", :attributes => {'frog' => nil})
       assert_equal nil, doc.attributes['frog']
     end
 
@@ -159,14 +179,58 @@ Yo, {myfrog}!
       assert_xpath '//a[@href="http://google.com"][text() = "Google"]', output, 1
     end
 
-    # See above - AsciiDoc says we're supposed to delete lines with bad
-    # attribute refs in them. AsciiDoc is strange.
-    #
-    # test "Unknowns" do
-    #   html = render_string("Look, a {gobbledygook}")
-    #   result = Nokogiri::HTML(html)
-    #   assert_equal("Look, a {gobbledygook}", result.css("p").first.content.strip)
-    # end
+    test 'should drop line with reference to undefined attribute' do
+      input = <<-EOS
+Line 1: This line should appear in the output.
+Line 2: Oh no, a {bogus-attribute}! This line should not appear in the output.
+      EOS
+
+      output = render_embedded_string input
+      assert_match(/Line 1/, output)
+      assert_no_match(/Line 2/, output)
+    end
+
+    test 'should not drop line with reference to undefined attribute if ignore-undefined attribute is set' do
+      input = <<-EOS
+:ignore-undefined:
+
+Line 1: This line should appear in the output.
+Line 2: A {bogus-attribute}! This time, this line should appear in the output.
+      EOS
+
+      output = render_embedded_string input
+      assert_match(/Line 1/, output)
+      assert_match(/Line 2/, output)
+      assert_match(/\{bogus-attribute\}/, output)
+    end
+
+    test 'should drop line with attribute unassignment' do
+      input = <<-EOS
+:a:
+
+Line 1: This line should appear in the output.
+Line 2: {set:a!}This line should not appear in the output.
+      EOS
+
+      output = render_embedded_string input
+      assert_match(/Line 1/, output)
+      assert_no_match(/Line 2/, output)
+    end
+
+    test 'should not drop line with attribute unassignment if ignore-undefined attribute is set' do
+      input = <<-EOS
+:ignore-undefined:
+:a:
+
+Line 1: This line should appear in the output.
+Line 2: {set:a!}This line should not appear in the output.
+      EOS
+
+      output = render_embedded_string input
+      assert_match(/Line 1/, output)
+      assert_match(/Line 2/, output)
+      assert_no_match(/\{set:a!\}/, output)
+    end
 
     test "substitutes inside unordered list items" do
       html = render_string(":foo: bar\n* snort at the {foo}\n* yawn")
@@ -549,6 +613,63 @@ ____
       assert_equal 'famous', qb.attributes['role']
     end
 
+    test 'role? returns true if role is assigned' do
+      input = <<-EOS
+[role="lead"]
+A paragraph
+      EOS
+
+      doc = document_from_string input
+      p = doc.blocks.first
+      assert p.role?
+    end
+
+    test 'role? can check for exact role name match' do
+      input = <<-EOS
+[role="lead"]
+A paragraph
+      EOS
+
+      doc = document_from_string input
+      p = doc.blocks.first
+      assert p.role?('lead')
+      p2 = doc.blocks.last
+      assert !p2.role?('final')
+    end
+
+    test 'has_role? can check for precense of role name' do
+      input = <<-EOS
+[role="lead abstract"]
+A paragraph
+      EOS
+
+      doc = document_from_string input
+      p = doc.blocks.first
+      assert !p.role?('lead')
+      assert p.has_role?('lead')
+    end
+
+    test 'roles returns array of role names' do
+      input = <<-EOS
+[role="story lead"]
+A paragraph
+      EOS
+
+      doc = document_from_string input
+      p = doc.blocks.first
+      assert_equal ['story', 'lead'], p.roles
+    end
+
+    test 'roles returns empty array if role attribute is not set' do
+      input = <<-EOS
+A paragraph
+      EOS
+
+      doc = document_from_string input
+      p = doc.blocks.first
+      assert_equal [], p.roles
+    end
+
     test "Attribute substitutions are performed on attribute list before parsing attributes" do
       input = <<-EOS
 :lead: role="lead"
@@ -561,15 +682,31 @@ A paragraph
       assert_equal 'lead', para.attributes['role']
     end
 
-    test 'id and role attributes can be specified on block style using shorthand syntax' do
+    test 'id, role and options attributes can be specified on block style using shorthand syntax' do
       input = <<-EOS
-[normal#first.lead]
+[normal#first.lead%step]
 A normal paragraph.
       EOS
       doc = document_from_string(input)
       para = doc.blocks.first
       assert_equal 'first', para.attributes['id']
       assert_equal 'lead', para.attributes['role']
+      assert_equal 'step', para.attributes['options']
+      assert para.attributes.has_key?('step-option')
+    end
+
+    test 'multiple roles and options can be specified in block style using shorthand syntax' do
+      input = <<-EOS
+[.role1%option1.role2%option2]
+Text
+      EOS
+
+      doc = document_from_string input
+      para = doc.blocks.first
+      assert_equal 'role1 role2', para.attributes['role']
+      assert_equal 'option1,option2', para.attributes['options']
+      assert para.attributes.has_key?('option1-option')
+      assert para.attributes.has_key?('option2-option')
     end
 
     test 'id and role attributes can be specified on section style using shorthand syntax' do

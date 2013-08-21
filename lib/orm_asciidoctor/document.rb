@@ -104,8 +104,8 @@ class Document < AbstractBlock
 
     if options[:parent]
       @parent_document = options.delete(:parent)
-      # QUESTION should we dup here? should we support setting attribute in parent document from nested document?
-      options[:attributes] = @parent_document.attributes.dup
+      # QUESTION should we support setting attribute in parent document from nested document?
+      options[:attributes] = @parent_document.attributes
       options[:base_dir] ||= @parent_document.base_dir
       @safe = @parent_document.safe
       @renderer = @parent_document.renderer
@@ -125,17 +125,19 @@ class Document < AbstractBlock
     @counters = {}
     @callouts = Callouts.new
     @options = options
-    # safely resolve the safe mode from const, int or string
-    if @safe.nil? && !(safe_mode = @options[:safe])
-      @safe = SafeMode::SECURE
-    elsif safe_mode.is_a?(Fixnum)
-      # be permissive in case API user wants to define new levels
-      @safe = safe_mode
-    else
-      begin
-        @safe = SafeMode.const_get(safe_mode.to_s.upcase).to_i
-      rescue
-        @safe = SafeMode::SECURE.to_i
+    if @parent_document.nil?
+      # safely resolve the safe mode from const, int or string
+      if @safe.nil? && !(safe_mode = @options[:safe])
+        @safe = SafeMode::SECURE
+      elsif safe_mode.is_a?(Fixnum)
+        # be permissive in case API user wants to define new levels
+        @safe = safe_mode
+      else
+        begin
+          @safe = SafeMode.const_get(safe_mode.to_s.upcase).to_i
+        rescue
+          @safe = SafeMode::SECURE.to_i
+        end
       end
     end
     @options[:header_footer] = @options.fetch(:header_footer, false)
@@ -160,13 +162,26 @@ class Document < AbstractBlock
     #@attributes['listing-caption'] = 'Listing'
     @attributes['table-caption'] = 'Table'
     @attributes['toc-title'] = 'Table of Contents'
+    @attributes['manname-title'] = 'NAME'
+    @attributes['untitled-label'] = 'Untitled'
     @attributes['version-label'] = 'Version'
     @attributes['last-update-label'] = 'Last updated'
 
+    # copy attributes map and normalize keys
     # attribute overrides are attributes that can only be set from the commandline
     # a direct assignment effectively makes the attribute a constant
-    # assigning a nil value will result in the attribute being unset
-    @attribute_overrides = options[:attributes] || {}
+    # a nil value or name with leading or trailing ! will result in the attribute being unassigned
+    @attribute_overrides = (options[:attributes] || {}).inject({}) do |collector,(key,value)|
+      if key.start_with?('!')
+        key = key[1..-1]
+        value = nil
+      elsif key.end_with?('!')
+        key = key[0..-2]
+        value = nil
+      end
+      collector[key] = value
+      collector
+    end
 
     @attribute_overrides['asciidoctor'] = ''
     @attribute_overrides['asciidoctor-version'] = VERSION
@@ -182,6 +197,11 @@ class Document < AbstractBlock
     # the only way to set the include-depth attribute is via the document options
     # 10 is the AsciiDoc default, though currently Asciidoctor only supports 1 level
     @attribute_overrides['include-depth'] ||= 10
+
+    # the only way to enable uri reads is via the document options, disabled by default
+    unless !@attribute_overrides['allow-uri-read'].nil?
+      @attribute_overrides['allow-uri-read'] = nil
+    end
 
     # if the base_dir option is specified, it overrides docdir as the root for relative paths
     # otherwise, the base_dir is the directory of the source file (docdir) or the current
@@ -218,7 +238,8 @@ class Document < AbstractBlock
       @attribute_overrides['docdir'] = ''
       if @safe >= SafeMode::SECURE
         # assign linkcss (preventing css embedding) unless explicitly disabled from the commandline or API
-        unless @attribute_overrides.fetch('linkcss', '').nil? || @attribute_overrides.has_key?('linkcss!')
+        # effectively the same has "has key 'linkcss' and value == nil"
+        unless @attribute_overrides.fetch('linkcss', '').nil?
           @attribute_overrides['linkcss'] = ''
         end
         # restrict document from enabling icons
@@ -231,9 +252,14 @@ class Document < AbstractBlock
       # a nil value undefines the attribute 
       if val.nil?
         @attributes.delete(key)
-      # a negative key undefines the attribute
-      elsif key.end_with? '!'
-        @attributes.delete(key[0..-2])
+      # a negative key (trailing !) undefines the attribute
+      # NOTE already normalize above as key with nil value
+      #elsif key.end_with? '!'
+      #  @attributes.delete(key[0..-2])
+      # a negative key (leading !) undefines the attribute
+      # NOTE already normalize above as key with nil value
+      #elsif key.start_with? '!'
+      #  @attributes.delete(key[1..-1])
       # otherwise it's an attribute assignment
       else
         # a value ending in @ indicates this attribute does not override
@@ -259,7 +285,7 @@ class Document < AbstractBlock
 
     if !@parent_document.nil?
       # don't need to do the extra processing within our own document
-      @reader = Reader.new(data)
+      @reader = Reader.new(data, self)
     else
       @reader = Reader.new(data, self, true, &block)
     end
@@ -402,13 +428,19 @@ class Document < AbstractBlock
   end
 
   # We need to be able to return some semblance of a title
-  def doctitle
-    if !(title = @attributes.fetch('title', '')).empty?
-      title
+  def doctitle(opts = {})
+    if !(val = @attributes.fetch('title', '')).empty?
+      val = title
     elsif !(sect = first_section).nil? && sect.title?
-      sect.title
+      val = sect.title
     else
-      nil
+      return nil
+    end
+    
+    if opts[:sanitize] && val.include?('<')
+      val.gsub(/<[^>]+>/, '').tr_s(' ', ' ').strip
+    else
+      val
     end
   end
   alias :name :doctitle
@@ -459,6 +491,17 @@ class Document < AbstractBlock
     if @attributes.has_key? 'toc2'
       @attributes['toc'] = ''
       @attributes['toc-class'] ||= 'toc2'
+      case (@attributes['toc-position'] || @attributes['toc2'])
+      when 'left', '<', '&lt;'
+        @attributes['toc-position'] = 'left'
+      when 'right', '>', '&gt;'
+        @attributes['toc-position'] = 'right'
+      when 'top', '^'
+        @attributes['toc-position'] = 'top'
+      when 'bottom', 'v'
+        @attributes['toc-position'] = 'bottom'
+      end
+      @attributes['toc-position'] ||= 'left'
     end
 
     @original_attributes = @attributes.dup
@@ -466,10 +509,11 @@ class Document < AbstractBlock
     # unfreeze "flexible" attributes
     unless nested?
       FLEXIBLE_ATTRIBUTES.each do |name|
-        @attribute_overrides.delete(name)
         # turning a flexible attribute off should be permanent
         # (we may need more config if that's not always the case)
-        #@attribute_overrides.delete("#{name}!")
+        if @attribute_overrides.has_key?(name) && !@attribute_overrides[name].nil?
+          @attribute_overrides.delete(name)
+        end
       end
     end
   end
@@ -542,7 +586,7 @@ class Document < AbstractBlock
   #
   # Returns true if the attribute is locked, false otherwise
   def attribute_locked?(name)
-    @attribute_overrides.has_key?(name) || @attribute_overrides.has_key?("#{name}!")
+    @attribute_overrides.has_key?(name)
   end
 
   # Internal: Apply substitutions to the attribute value

@@ -98,6 +98,9 @@ module Substituters
     elsif @document.attributes['basebackend'] == 'html' && @style == 'source' &&
       @document.attributes['source-highlighter'] == 'coderay' && attr?('language')
       sub_callouts(highlight_source(lines.join))
+    elsif @document.attributes['basebackend'] == 'htmlbook' && @style == 'source' &&
+      @document.attributes['source-highlighter'] == 'coderay' && attr?('language')
+      sub_callouts(highlight_source(lines.join))
     else
       apply_subs(lines.join, COMPOSITE_SUBS[:verbatim])
     end
@@ -169,6 +172,28 @@ module Substituters
       "\e#{index}\e"
     } unless !(result.include?('+++') || result.include?('$$') || result.include?('pass:'))
 
+# add support for latexmath passthrough
+# work in progress
+
+#    result.gsub!(REGEXP[:pass_latexmath]) {
+      # alias match for Ruby 1.8.7 compat
+#      m = $~
+      # honor the escape
+#      if m[0].start_with? '\\'
+#        next m[0][1..-1]
+#      end
+
+#      if !m[1].nil? && !m[1].empty?
+#        subs = resolve_subs(m[1])
+#      else
+#        subs = []
+#      end
+
+#      @passthroughs << {:text => m[2].gsub('\]', ']'), :subs => subs, :latexmath => true}
+#      index = @passthroughs.size - 1
+#      "\e#{index}\e"
+#    } unless !(result.include?('latexmath'))
+
     result.gsub!(REGEXP[:pass_lit]) {
       # alias match for Ruby 1.8.7 compat
       m = $~
@@ -207,7 +232,30 @@ module Substituters
       pass = @passthroughs[$1.to_i];
       text = apply_subs(pass[:text], pass.fetch(:subs, []))
       pass[:literal] ? Inline.new(self, :quoted, text, :type => :monospaced, :attributes => pass.fetch(:attributes, {})).render : text
+
+      # ORM: if passthroughs are not literal or latexmath, run through docbook2htmlbook conversion first
+
+       #if (pass[:literal] || pass[:latexmath]) != true
+       if pass[:literal] != true
+
+        passthrough_text = pass[:text]
+
+          # set up xslt
+          stylesheet_file = LibXML::XML::Document.file('../../../../docbook2htmlbook/db2htmlbook.xsl')
+          xslt = LibXSLT::XSLT::Stylesheet.new(stylesheet_file)
+
+          # set up xml
+          parser = LibXML::XML::Parser.string(passthrough_text, :encoding => XML::Encoding::UTF_8)
+          xml = parser.parse
+
+          # apply xslt to xml
+          result = xslt.apply(xml)
+
+          # strip off the encoding line
+          result.to_s.gsub(/<\?xml version="1.0" encoding="UTF-8"\?>/, '')
+      end
     }
+
   end
 
   # Public: Substitute special characters (i.e., encode XML)
@@ -306,8 +354,11 @@ module Substituters
             args = expr.split(':')
             _, value = Lexer::store_attribute(args[0], args[1] || '', @document)
             if value.nil?
-              reject = true
-              break '{undefined}'
+              reject = !(@document.attributes.has_key? 'ignore-undefined')
+              if reject
+                Debug.debug { "Undefining attribute: #{key}, line marked for removal" }
+                break ''
+              end
             end
             ''
           when 'counter', 'counter2'
@@ -324,9 +375,13 @@ module Substituters
         elsif INTRINSICS.has_key? key
           INTRINSICS[key]
         else
-          Debug.debug { "Missing attribute: #{key}, line marked for removal" }
-          reject = true
-          break '{undefined}'
+          reject = !(@document.attributes.has_key? 'ignore-undefined')
+          if reject
+            Debug.debug { "Missing attribute: #{key}, line marked for removal" }
+            break ''
+          else
+            "{#{key}}"
+          end
         end
       } if line.include? '{' 
 
@@ -472,7 +527,7 @@ module Substituters
           next m[0][1..-1]
         end
 
-        terms = unescape_bracketed_text(m[1] || m[2]).split(',').map(&:strip)
+        terms = unescape_bracketed_text(m[1] || m[2]).split(/(?:"|" )?,(?:"| ")?/).map(&:strip)
         document.register(:indexterms, [*terms])
         Inline.new(self, :indexterm, text, :attributes => {'terms' => terms}).render
       }
@@ -716,10 +771,10 @@ module Substituters
       # alias match for Ruby 1.8.7 compat
       m = $~
       # honor the escape
-      if m[0].start_with? '\\'
-        next "&lt;#{m[1]}&gt;"
+      if m[1] == '\\'
+        next "&lt;#{m[2]}&gt;"
       end
-      Inline.new(self, :callout, m[1], :id => document.callouts.read_next_id).render
+      Inline.new(self, :callout, m[2], :id => document.callouts.read_next_id).render
     }
   end
 
@@ -820,7 +875,7 @@ module Substituters
   # returns the highlighted source code, if a source highlighter is defined
   # on the document, otherwise the unprocessed text
   def highlight_source(source)
-    Helpers.require_library 'coderay'
+    Helpers.require_library 'coderay', true
     ::CodeRay::Duo[attr('language', 'text').to_sym, :html, {
         :css => @document.attributes.fetch('coderay-css', 'class').to_sym,
         :line_numbers => (attr?('linenums') ? @document.attributes.fetch('coderay-linenums-mode', 'table').to_sym : nil),

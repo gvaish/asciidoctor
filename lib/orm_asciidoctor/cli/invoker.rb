@@ -62,12 +62,14 @@ module Asciidoctor
              inputs = infiles.map {|infile| File.new infile}
           end
 
-          if outfile == '-' || (infiles.size == 1 && infiles.first == '-' && (outfile.to_s.empty? || outfile != '/dev/null'))
+          # NOTE: if infile is stdin, default to outfile as stout
+          if outfile == '-' || (infiles.size == 1 && infiles.first == '-' && outfile.to_s.empty?)
             tofile = (@out || $stdout)
           elsif !outfile.nil?
             tofile = outfile
           else
             tofile = nil
+            # automatically calculate outfile based on infile
             opts[:in_place] = true unless opts.has_key? :to_dir
           end
 
@@ -85,8 +87,8 @@ module Asciidoctor
               monitor = opts[:monitor]
               puts "Input file: #{input.respond_to?(:path) ? input.path : '-'}"
               puts "  Time to read and parse source: #{'%05.5f' % monitor[:parse]}"
-              puts "  Time to render document: #{'%05.5f' % monitor[:parse]}"
-              puts "  Total time to read, parse and render: #{'%05.5f' % monitor[:parse]}"
+              puts "  Time to render document: #{'%05.5f' % monitor[:render]}"
+              puts "  Total time to read, parse and render: #{'%05.5f' % monitor[:load_render]}"
             end
           end
         rescue Exception => e

@@ -1,11 +1,99 @@
 module Asciidoctor
-module HTML5
+module HTMLBook
   # Internal: Generate the default stylesheet for CodeRay
   #
   # returns the default CodeRay stylesheet as a String
   def self.default_coderay_stylesheet
-    ::Asciidoctor::Helpers.require_library 'coderay'
-    ::CodeRay::Encoders[:html]::CSS.new(:default).stylesheet
+    #::Asciidoctor::Helpers.require_library 'coderay', true
+    #::CodeRay::Encoders[:html]::CSS.new(:default).stylesheet
+    <<'DEFAULT_CODERAY_STYLESHEET'
+/* Foundation stylesheet for CodeRay (to match GitHub theme) | MIT License | http://foundation.zurb.com */
+table.CodeRay { border-collapse: collapse; width: 100%; padding: 2px; margin-bottom: 0; border: 0; background: transparent; }
+table.CodeRay td { padding: 0 .5em; vertical-align: top; }
+table.CodeRay td.line-numbers { text-align: right; color: #999; border-right: 1px solid #e5e5e5; padding-left: 0; }
+span.line-numbers { border-right: 1px solid #E5E5E5; color: #999; display: inline-block; margin-right: 0.5em; padding-right: 0.5em; }
+.CodeRay td.line-numbers strong, .CodeRay span.line-numbers strong { font-weight: normal; }
+.CodeRay .debug { color: white !important; background: blue !important; }
+.CodeRay .annotation { color: #007; }
+.CodeRay .attribute-name { color: #f08; }
+.CodeRay .attribute-value { color: #700; }
+.CodeRay .binary { color: #509; }
+.CodeRay .comment  { color: #999; font-style: italic; }
+.CodeRay .char { color: #04D; }
+.CodeRay .char .content { color: #04D; }
+.CodeRay .char .delimiter { color: #039; }
+.CodeRay .class { color: #458; }
+.CodeRay .complex { color: #A08; }
+.CodeRay .constant { color: teal; }
+.CodeRay .color { color: #0A0; }
+.CodeRay .class-variable { color: #369; }
+.CodeRay .decorator { color: #B0B; }
+.CodeRay .definition { color: #099; }
+.CodeRay .directive { color: #088; }
+.CodeRay .delimiter { color: black; }
+.CodeRay .doc { color: #970; }
+.CodeRay .doctype { color: #34b; }
+.CodeRay .doc-string { color: #D42; }
+.CodeRay .escape  { color: #666; }
+.CodeRay .entity { color: #800; }
+.CodeRay .error { color: #808; }
+.CodeRay .exception { color: #C00; }
+.CodeRay .filename { color: #099; }
+.CodeRay .function { color: #900; }
+.CodeRay .global-variable { color: teal; }
+.CodeRay .hex { color: #058; }
+.CodeRay .integer  { color: #099; }
+.CodeRay .include { color: #B44; }
+.CodeRay .inline { color: black; }
+.CodeRay .inline .inline { background: #ccc; }
+.CodeRay .inline .inline .inline { background: #bbb; }
+.CodeRay .inline .inline-delimiter { color: #D14; }
+.CodeRay .inline-delimiter { color: #D14; }
+.CodeRay .important { color: #f00; }
+.CodeRay .interpreted { color: #B2B; }
+.CodeRay .instance-variable { color: teal; }
+.CodeRay .label { color: #970; }
+.CodeRay .local-variable { color: #963; }
+.CodeRay .octal { color: #40E; }
+.CodeRay .predefined { color: #369; }
+.CodeRay .preprocessor { color: #579; }
+.CodeRay .pseudo-class { color: #00C; }
+.CodeRay .predefined-type { color: #074; }
+.CodeRay .reserved, .keyword  { color: #000; }
+.CodeRay .key { color: #808; }
+.CodeRay .key .delimiter { color: #606; }
+.CodeRay .key .char { color: #80f; }
+.CodeRay .value { color: #088; }
+.CodeRay .regexp { background-color: #fff0ff; }
+.CodeRay .regexp .content { color: #808; }
+.CodeRay .regexp .delimiter { color: #404; }
+.CodeRay .regexp .modifier { color: #C2C; }
+.CodeRay .regexp .function  { color: #404; font-weight: bold; }
+.CodeRay .string { color: #D20; }
+.CodeRay .string .string { }
+.CodeRay .string .string .string { background-color: #ffd0d0; }
+.CodeRay .string .content { color: #D14; }
+.CodeRay .string .char { color: #D14; }
+.CodeRay .string .delimiter { color: #D14; }
+.CodeRay .shell { color: #D14; }
+.CodeRay .shell .content { }
+.CodeRay .shell .delimiter { color: #D14; }
+.CodeRay .symbol { color: #990073; }
+.CodeRay .symbol .content { color: #A60; }
+.CodeRay .symbol .delimiter { color: #630; }
+.CodeRay .tag, .CodeRay .attribute-name { color: #070; }
+.CodeRay .tag-special { color: #D70; }
+.CodeRay .type { color: #339; }
+.CodeRay .variable  { color: #036; }
+.CodeRay .insert { background: #afa; }
+.CodeRay .delete { background: #faa; }
+.CodeRay .change { color: #aaf; background: #007; }
+.CodeRay .head { color: #f8f; background: #505; }
+.CodeRay .insert .insert { color: #080; }
+.CodeRay .delete .delete { color: #800; }
+.CodeRay .change .change { color: #66f; }
+.CodeRay .head .head { color: #f4f; }
+DEFAULT_CODERAY_STYLESHEET
   end
 
   # Internal: Generate the default stylesheet for Asciidoctor
@@ -72,7 +160,7 @@ img { display: inline-block; vertical-align: middle; }
 textarea { height: auto; min-height: 50px; }
 select { width: 100%; }
 p.lead, .paragraph.lead > p, #preamble > .sectionbody > .paragraph:first-of-type p { font-size: 1.21875em; line-height: 1.6; }
-.subheader, .admonitionblock td.content > .title, .exampleblock > .title, .imageblock > .title, .listingblock > .title, .literalblock > .title, .openblock > .title, .paragraph > .title, .quoteblock > .title, .sidebarblock > .title, .tableblock > .title, .verseblock > .title, .ulist > .title, .olist > .title, .dlist > .title, .qlist > .title, .tableblock > caption { line-height: 1.4; color: #7a2518; font-weight: 300; margin-top: 0.2em; margin-bottom: 0.5em; }
+.subheader, .admonitionblock td.content > .title, .exampleblock > .title, .imageblock > .title, .listingblock > .title, .literalblock > .title, .openblock > .title, .paragraph > .title, .quoteblock > .title, .sidebarblock > .title, .tableblock > .title, .verseblock > .title, .ulist > .title, .olist > .title, .dlist > .title, .qlist > .title, .hdlist > .title, .tableblock > caption { line-height: 1.4; color: #7a2518; font-weight: 300; margin-top: 0.2em; margin-bottom: 0.5em; }
 div, dl, dt, dd, ul, ol, li, h1, h2, h3, #toctitle, .sidebarblock > .content > .title, h4, h5, h6, pre, form, p, blockquote, th, td { margin: 0; padding: 0; direction: ltr; }
 a { color: #005498; text-decoration: underline; line-height: inherit; }
 a:hover, a:focus { color: #00467f; }
@@ -174,17 +262,19 @@ p a > code:hover { color: #561309; }
   #toc.toc2 #toctitle { margin-top: 0; }
   #toc.toc2 > ul, #toc.toc2 > ol { font-size: .95em; }
   #toc.toc2 ul ul, #toc.toc2 ol ol { margin-left: 0; padding-left: 1.25em; }
-  #toc.toc2 ul.sectlevel0 ul.sectlevel1, #toc.toc2 ol.sectlevel0 ol.sectlevel1 { padding-left: 0; margin-top: 0.5em; margin-bottom: 0.5em; } }
+  #toc.toc2 ul.sectlevel0 ul.sectlevel1, #toc.toc2 ol.sectlevel0 ol.sectlevel1 { padding-left: 0; margin-top: 0.5em; margin-bottom: 0.5em; }
+  body.toc2.toc-right { padding-left: 0; padding-right: 20em; }
+  body.toc2.toc-right #toc.toc2 { border-right: 0; border-left: 1px solid #ebebeb; left: auto; right: 0; } }
 #footer { max-width: 100%; background-color: #222222; padding: 1.25em; }
 #footer-text { color: #dddddd; line-height: 1.44; }
-.sect1 { border-bottom: 3px double #ebebeb; padding-bottom: 1.25em; }
-.sect1:last-of-type { border-bottom: 0; }
+.sect1 { padding-bottom: 1.25em; }
+.sect1 + .sect1 { border-top: 3px double #ebebeb; }
 #content h1 > a.anchor, h2 > a.anchor, h3 > a.anchor, #toctitle > a.anchor, .sidebarblock > .content > .title > a.anchor, h4 > a.anchor, h5 > a.anchor, h6 > a.anchor { position: absolute; width: 1em; margin-left: -1em; display: block; text-decoration: none; visibility: hidden; text-align: center; font-weight: normal; }
 #content h1 > a.anchor:before, h2 > a.anchor:before, h3 > a.anchor:before, #toctitle > a.anchor:before, .sidebarblock > .content > .title > a.anchor:before, h4 > a.anchor:before, h5 > a.anchor:before, h6 > a.anchor:before { content: '\00A7'; font-size: .85em; vertical-align: text-top; display: block; margin-top: 0.05em; }
 #content h1:hover > a.anchor, #content h1 > a.anchor:hover, h2:hover > a.anchor, h2 > a.anchor:hover, h3:hover > a.anchor, #toctitle:hover > a.anchor, .sidebarblock > .content > .title:hover > a.anchor, h3 > a.anchor:hover, #toctitle > a.anchor:hover, .sidebarblock > .content > .title > a.anchor:hover, h4:hover > a.anchor, h4 > a.anchor:hover, h5:hover > a.anchor, h5 > a.anchor:hover, h6:hover > a.anchor, h6 > a.anchor:hover { visibility: visible; }
 #content h1 > a.link, h2 > a.link, h3 > a.link, #toctitle > a.link, .sidebarblock > .content > .title > a.link, h4 > a.link, h5 > a.link, h6 > a.link { color: #ba3925; text-decoration: none; }
 #content h1 > a.link:hover, h2 > a.link:hover, h3 > a.link:hover, #toctitle > a.link:hover, .sidebarblock > .content > .title > a.link:hover, h4 > a.link:hover, h5 > a.link:hover, h6 > a.link:hover { color: #a53221; }
-.admonitionblock td.content > .title, .exampleblock > .title, .imageblock > .title, .listingblock > .title, .literalblock > .title, .openblock > .title, .paragraph > .title, .quoteblock > .title, .sidebarblock > .title, .tableblock > .title, .verseblock > .title, .ulist > .title, .olist > .title, .dlist > .title, .qlist > .title { text-align: left; font-weight: bold; }
+.admonitionblock td.content > .title, .exampleblock > .title, .imageblock > .title, .listingblock > .title, .literalblock > .title, .openblock > .title, .paragraph > .title, .quoteblock > .title, .sidebarblock > .title, .tableblock > .title, .verseblock > .title, .ulist > .title, .olist > .title, .dlist > .title, .qlist > .title, .hdlist > .title { text-align: left; font-weight: bold; }
 .tableblock > caption { text-align: left; font-weight: bold; white-space: nowrap; overflow: visible; max-width: 0; }
 table.tableblock #preamble > .sectionbody > .paragraph:first-of-type p { font-size: inherit; }
 .admonitionblock > table { border: 0; background: none; width: 100%; }
@@ -278,11 +368,12 @@ td.hdlist1 { vertical-align: top; padding-right: .8em; font-weight: bold; }
 .image.right { margin-left: 0.625em; }
 span.footnote, span.footnoteref { vertical-align: super; font-size: 0.875em; }
 span.footnote a, span.footnoteref a { text-decoration: none; }
-#footnotes { padding: 0.75em 0.375em; margin-bottom: 1.25em; #border-top: 1px solid #dddddd; }
+#footnotes { padding: 0.75em 0.375em; margin-bottom: 1.25em; }
 #footnotes hr { width: 20%; min-width: 6.25em; margin: -.25em 0 .75em 0; border-width: 1px 0 0 0; }
 #footnotes .footnote { line-height: 1.3; font-size: 0.875em; margin-left: 1.2em; text-indent: -1.2em; margin-bottom: .2em; }
-#footnotes .footnote a { font-weight: bold; text-decoration: none; }
+#footnotes .footnote a:first-of-type { font-weight: bold; text-decoration: none; }
 #footnotes .footnote:last-of-type { margin-bottom: 0; }
+#content #footnotes { margin-top: -0.625em; }
 .gist .file-data > table { border: none; background: #fff; width: 100%; margin-bottom: 0; }
 .gist .file-data > table td.line-data { width: 99%; }
 div.unbreakable { page-break-inside: avoid; }
@@ -331,8 +422,9 @@ div.unbreakable { page-break-inside: avoid; }
 .admonitionblock td.icon .icon-important:before { content: "\f06a"; color: #bf0000; }
 .conum { display: inline-block; color: white !important; background-color: #222222; -webkit-border-radius: 100px; border-radius: 100px; text-align: center; width: 20px; height: 20px; font-size: 12px; font-weight: bold; line-height: 20px; font-family: Arial, sans-serif; font-style: normal; position: relative; top: -2px; letter-spacing: -1px; }
 .conum * { color: white !important; }
-.conum:empty { display: none; }
-pre .comment .conum { left: -20px; }
+.conum + b { display: none; }
+.conum:after { content: attr(data-value); }
+.conum:not([data-value]):empty { display: none; }
 .literalblock > .content > pre, .listingblock > .content > pre { -webkit-border-radius: 0; border-radius: 0; }
 DEFAULT_ASCIIDOCTOR_STYLESHEET
   end

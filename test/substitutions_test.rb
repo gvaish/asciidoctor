@@ -440,6 +440,30 @@ context 'Substitutions' do
           para.sub_macros(para.buffer.join).gsub(/>\s+</, '><')
     end
 
+    test 'an inline image macro with a url target should be interpreted as an image' do
+      para = block_from_string %(Beware of the image:http://example.com/images/tiger.png[tiger].)
+      assert_equal %{Beware of the <span class="image"><img src="http://example.com/images/tiger.png" alt="tiger"></span>.},
+          para.sub_macros(para.buffer.join).gsub(/>\s+</, '><')
+    end
+
+    test 'should prepend value of imagesdir attribute to inline image target if target is relative path' do
+      para = block_from_string %(Beware of the image:tiger.png[tiger].), :attributes => {'imagesdir' => './images'}
+      assert_equal %{Beware of the <span class="image"><img src="./images/tiger.png" alt="tiger"></span>.},
+          para.sub_macros(para.buffer.join).gsub(/>\s+</, '><')
+    end
+
+    test 'should not prepend value of imagesdir attribute to inline image target if target is absolute path' do
+      para = block_from_string %(Beware of the image:/tiger.png[tiger].), :attributes => {'imagesdir' => './images'}
+      assert_equal %{Beware of the <span class="image"><img src="/tiger.png" alt="tiger"></span>.},
+          para.sub_macros(para.buffer.join).gsub(/>\s+</, '><')
+    end
+
+    test 'should not prepend value of imagesdir attribute to inline image target if target is url' do
+      para = block_from_string %(Beware of the image:http://example.com/images/tiger.png[tiger].), :attributes => {'imagesdir' => './images'}
+      assert_equal %{Beware of the <span class="image"><img src="http://example.com/images/tiger.png" alt="tiger"></span>.},
+          para.sub_macros(para.buffer.join).gsub(/>\s+</, '><')
+    end
+
     test 'a block image macro should not be detected within paragraph text' do
       para = block_from_string(%(Not an inline image macro image::tiger.png[].))
       result = para.sub_macros(para.buffer.join)
@@ -478,6 +502,24 @@ context 'Substitutions' do
       assert_equal 1, para.document.references[:footnotes].size
       footnote1 = para.document.references[:footnotes][0]
       assert_equal '<a href="http://github.com">GitHub</a>', footnote1.text
+    end
+
+    test 'a footnote macro may contain a plain URL' do
+      para = block_from_string %(the JLine footnote:[https://github.com/jline/jline2]\nlibrary.)
+      result = para.sub_macros para.buffer.join
+      assert_equal %(the JLine <span class="footnote">[<a id="_footnoteref_1" class="footnote" href="#_footnote_1" title="View footnote.">1</a>]</span>\nlibrary.), result
+      assert_equal 1, para.document.references[:footnotes].size
+      fn1 = para.document.references[:footnotes].first
+      assert_equal '<a href="https://github.com/jline/jline2">https://github.com/jline/jline2</a>', fn1.text
+    end
+
+    test 'a footnote macro followed by a semi-colon may contain a plain URL' do
+      para = block_from_string %(the JLine footnote:[https://github.com/jline/jline2];\nlibrary.)
+      result = para.sub_macros para.buffer.join
+      assert_equal %(the JLine <span class="footnote">[<a id="_footnoteref_1" class="footnote" href="#_footnote_1" title="View footnote.">1</a>]</span>;\nlibrary.), result
+      assert_equal 1, para.document.references[:footnotes].size
+      fn1 = para.document.references[:footnotes].first
+      assert_equal '<a href="https://github.com/jline/jline2">https://github.com/jline/jline2</a>', fn1.text
     end
 
     test 'should increment index of subsequent footnote macros' do

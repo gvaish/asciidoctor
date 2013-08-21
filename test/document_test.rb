@@ -708,6 +708,20 @@ text
       assert_css '#header h1', output, 1
       assert_css '#content h1', output, 0
     end
+
+    test 'should sanitize contents of HTML title element' do
+      input = <<-EOS
+= *Document* image:logo.png[] _Title_ image:another-logo.png[]
+
+content
+      EOS
+
+      output = render_string input
+      assert_xpath '/html/head/title[text()="Document Title"]', output, 1
+      nodes = xmlnodes_at_xpath('//*[@id="header"]/h1', output, 1)
+      assert_equal 1, nodes.size
+      assert_match(/<h1><strong>Document<\/strong> <span class="image"><img src="logo.png" alt="logo"><\/span> <em>Title<\/em> <span class="image"><img src="another-logo.png" alt="another-logo"><\/span><\/h1>/, output)
+    end
      
     test 'should not choke on empty source' do
       doc = Asciidoctor::Document.new ''
@@ -1101,6 +1115,112 @@ preamble
       assert doc.attr?('toc')
       assert_equal '', doc.attr('toc')
       assert_equal 'Dan Allen', doc.attr('author')
+    end
+
+    test 'should parse mantitle and manvolnum from document title for manpage doctype' do
+      input = <<-EOS
+= asciidoctor ( 1 )
+:doctype: manpage
+
+== NAME
+
+asciidoctor - converts AsciiDoc source files to HTML, DocBook and other formats
+      EOS
+
+       doc = document_from_string input
+       assert_equal 'asciidoctor', doc.attr('mantitle')
+       assert_equal '1', doc.attr('manvolnum')
+    end
+
+    test 'should perform attribute substitution on mantitle in manpage doctype' do
+      input = <<-EOS
+= {app}(1)
+:doctype: manpage
+:app: asciidoctor
+
+== NAME
+
+asciidoctor - converts AsciiDoc source files to HTML, DocBook and other formats
+      EOS
+
+       doc = document_from_string input
+       assert_equal 'asciidoctor', doc.attr('mantitle')
+    end
+
+    test 'should consume name section as manname and manpurpose for manpage doctype' do
+      input = <<-EOS
+= asciidoctor(1)
+:doctype: manpage
+
+== NAME
+
+asciidoctor - converts AsciiDoc source files to HTML, DocBook and other formats
+      EOS
+
+       doc = document_from_string input
+       assert_equal 'asciidoctor', doc.attr('manname')
+       assert_equal 'converts AsciiDoc source files to HTML, DocBook and other formats', doc.attr('manpurpose')
+       assert_equal 0, doc.blocks.size
+    end
+
+    test 'should set docname and outfilesuffix from manname and manvolnum for manpage backend and doctype' do
+      input = <<-EOS
+= asciidoctor(1)
+:doctype: manpage
+
+== NAME
+
+asciidoctor - converts AsciiDoc source files to HTML, DocBook and other formats
+      EOS
+
+       doc = document_from_string input, :backend => 'manpage'
+       assert_equal 'asciidoctor', doc.attributes['docname']
+       assert_equal '.1', doc.attributes['outfilesuffix']
+    end
+
+    test 'should mark synopsis as special section in manpage doctype' do
+      input = <<-EOS
+= asciidoctor(1)
+:doctype: manpage
+
+== NAME
+
+asciidoctor - converts AsciiDoc source files to HTML, DocBook and other formats
+
+== SYNOPSIS
+
+*asciidoctor* ['OPTION']... 'FILE'..
+      EOS
+
+       doc = document_from_string input
+       synopsis_section = doc.blocks.first 
+       assert_not_nil synopsis_section
+       assert_equal :section, synopsis_section.context
+       assert synopsis_section.special
+       assert_equal 'synopsis', synopsis_section.sectname
+    end
+
+    test 'should output special header block in HTML for manpage doctype' do
+      input = <<-EOS
+= asciidoctor(1)
+:doctype: manpage
+
+== NAME
+
+asciidoctor - converts AsciiDoc source files to HTML, DocBook and other formats
+
+== SYNOPSIS
+
+*asciidoctor* ['OPTION']... 'FILE'..
+      EOS
+
+      output = render_string input
+      assert_css 'body.manpage', output, 1
+      assert_xpath '//body/*[@id="header"]/h1[text()="asciidoctor(1) Manual Page"]', output, 1
+      assert_xpath '//body/*[@id="header"]/h1/following-sibling::h2[text()="NAME"]', output, 1
+      assert_xpath '//h2[text()="NAME"]/following-sibling::*[@class="sectionbody"]', output, 1
+      assert_xpath '//h2[text()="NAME"]/following-sibling::*[@class="sectionbody"]/p[text()="asciidoctor - converts AsciiDoc source files to HTML, DocBook and other formats"]', output, 1
+      assert_xpath '//*[@id="content"]/*[@class="sect1"]/h2[text()="SYNOPSIS"]', output, 1
     end
   end
 end

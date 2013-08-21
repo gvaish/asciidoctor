@@ -182,7 +182,34 @@ include::fixtures/no-such-file.ad[]
         doc = document_from_string input, :safe => Asciidoctor::SafeMode::SAFE, :attributes => {'docdir' => File.dirname(__FILE__)}
         assert_equal 0, doc.blocks.size
       rescue
-        flunk('include macro should not raise exception on missing file')
+        flunk 'include macro should not raise exception on missing file'
+      end
+    end
+
+    test 'include macro can retrieve data from uri' do
+      input = <<-EOS
+....
+include::https://raw.github.com/asciidoctor/asciidoctor/master/LICENSE[]
+....
+      EOS
+
+      output = render_embedded_string input, :safe => :safe, :attributes => {'allow-uri-read' => ''}
+      assert_match(/MIT/, output)
+    end
+
+    test 'inaccessible uri referenced by include macro does not crash processor' do
+      input = <<-EOS
+....
+include::http://localhost:0[]
+....
+      EOS
+
+      begin
+        output = render_embedded_string input, :safe => :safe, :attributes => {'allow-uri-read' => ''}
+        assert_css 'pre', output, 1
+        assert_css 'pre *', output, 0
+      rescue
+        flunk 'include macro should not raise exception on inaccessible uri'
       end
     end
 
@@ -871,6 +898,46 @@ endlines\r
       assert_equal 'foobar', @reader.sanitize_attribute_name("Foo Bar")
       assert_equal 'foo', @reader.sanitize_attribute_name("foo")
       assert_equal 'foo3-bar', @reader.sanitize_attribute_name("Foo 3^ # - Bar[")
+    end
+
+    test 'should not skip front matter by default' do
+      input = <<-EOS
+---
+layout: post
+title: Document Title
+author: username
+tags: [ first, second ]
+---
+= Document Title
+Author Name
+
+preamble
+      EOS
+
+      doc = Asciidoctor::Document.new
+      reader = Asciidoctor::Reader.new(input.lines.entries, doc, true)
+      assert_equal '---', reader.peek_line.rstrip
+    end
+
+    test 'should skip front matter if specified by skip-front-matter attribute' do
+      front_matter = %(layout: post
+title: Document Title
+author: username
+tags: [ first, second ])
+      input = <<-EOS
+---
+#{front_matter}
+---
+= Document Title
+Author Name
+
+preamble
+      EOS
+
+      doc = Asciidoctor::Document.new nil, :attributes => {'skip-front-matter' => ''}
+      reader = Asciidoctor::Reader.new(input.lines.entries, doc, true)
+      assert_equal '= Document Title', reader.peek_line.rstrip
+      assert_equal front_matter, doc.attributes['front-matter']
     end
   end
 end
