@@ -5,9 +5,9 @@ $:.unshift File.join(File.dirname(__FILE__), '..', 'lib')
 if RUBY_VERSION < '1.9'
   require 'rubygems'
 end
-require 'asciidoctor'
-require 'asciidoctor/cli/options'
-require 'asciidoctor/cli/invoker'
+require 'orm_asciidoctor'
+require 'orm_asciidoctor/cli/options'
+require 'orm_asciidoctor/cli/invoker'
 
 invoker = Asciidoctor::Cli::Invoker.new(ARGV)
 invoker.invoke!

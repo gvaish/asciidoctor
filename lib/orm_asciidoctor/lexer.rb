@@ -694,6 +694,8 @@ class Lexer
         when :literal
           block = build_block(block_context, :verbatim, terminator, parent, reader, attributes)
         
+        #ORM: latexmath is work in progress
+        #when :pass, :latexmath
         when :pass
           block = build_block(block_context, :simple, terminator, parent, reader, attributes)
 

@@ -1,5 +1,5 @@
 module Asciidoctor
-module HTML5
+module HTMLBook
   # Internal: Generate the default stylesheet for CodeRay
   #
   # returns the default CodeRay stylesheet as a String

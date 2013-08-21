@@ -5,26 +5,25 @@ Gem::Specification.new do |s|
 
   ## name, version, date and rubyforge_project are updated automatically by the
   ## Rake build (see the validate task)
-  s.name              = 'asciidoctor'
-  s.version           = '0.1.4.preview.3'
-  s.date              = '2013-07-23'
-  s.rubyforge_project = 'asciidoctor'
+  s.name              = 'orm_asciidoctor'
+  s.version           = '0.0.0'
+  s.date              = '2013-07-29'
+  ## s.rubyforge_project = 'asciidoctor'
 
-  s.summary     = 'A native Ruby AsciiDoc syntax processor and publishing toolchain'
+  s.summary     = 'ORM fork of asciidoctor, a native Ruby AsciiDoc syntax processor and publishing toolchain'
   s.description = <<-EOS
-An open source text processor and publishing toolchain written in Ruby for converting AsciiDoc markup into HTML 5, DocBook 4.5 and custom formats.
+ORM fork of asciidoctor, an open source text processor and publishing toolchain written in Ruby for converting AsciiDoc markup into HTML 5, DocBook 4.5 and custom formats.
 EOS
-  s.license     = 'MIT'
   s.authors  = ['Dan Allen', 'Ryan Waldron', 'Jeremy McAnally', 'Jason Porter', 'Nick Hengeveld']
   s.email    = ['dan.j.allen@gmail.com', 'rew@erebor.com']
   s.homepage = 'http://asciidoctor.org'
 
   s.require_paths = %w[lib]
-  s.executables = ['asciidoctor', 'asciidoctor-safe']
+  s.executables = ['orm_asciidoctor', 'orm_asciidoctor-safe']
 
-  s.has_rdoc = true
-  s.rdoc_options = ['--charset=UTF-8']
-  s.extra_rdoc_files = %w[LICENSE]
+##  s.has_rdoc = true
+##  s.rdoc_options = ['--charset=UTF-8']
+##  s.extra_rdoc_files = %w[LICENSE]
 
   ## List your runtime dependencies here. Runtime dependencies are those
   ## that are needed for an end user to actually USE your code.
@@ -52,35 +51,36 @@ EOS
     LICENSE
     README.adoc
     Rakefile
-    asciidoctor.gemspec
-    bin/asciidoctor
-    bin/asciidoctor-safe
+    orm_asciidoctor.gemspec
+    bin/orm_asciidoctor
+    bin/orm_asciidoctor-safe
     compat/asciidoc.conf
-    lib/asciidoctor.rb
-    lib/asciidoctor/abstract_block.rb
-    lib/asciidoctor/abstract_node.rb
-    lib/asciidoctor/attribute_list.rb
-    lib/asciidoctor/backends/_stylesheets.rb
-    lib/asciidoctor/backends/base_template.rb
-    lib/asciidoctor/backends/docbook45.rb
-    lib/asciidoctor/backends/html5.rb
-    lib/asciidoctor/block.rb
-    lib/asciidoctor/callouts.rb
-    lib/asciidoctor/cli/invoker.rb
-    lib/asciidoctor/cli/options.rb
-    lib/asciidoctor/debug.rb
-    lib/asciidoctor/document.rb
-    lib/asciidoctor/helpers.rb
-    lib/asciidoctor/inline.rb
-    lib/asciidoctor/lexer.rb
-    lib/asciidoctor/list_item.rb
-    lib/asciidoctor/path_resolver.rb
-    lib/asciidoctor/reader.rb
-    lib/asciidoctor/renderer.rb
-    lib/asciidoctor/section.rb
-    lib/asciidoctor/substituters.rb
-    lib/asciidoctor/table.rb
-    lib/asciidoctor/version.rb
+    lib/orm_asciidoctor.rb
+    lib/orm_asciidoctor/abstract_block.rb
+    lib/orm_asciidoctor/abstract_node.rb
+    lib/orm_asciidoctor/attribute_list.rb
+    lib/orm_asciidoctor/backends/_stylesheets.rb
+    lib/orm_asciidoctor/backends/base_template.rb
+    lib/orm_asciidoctor/backends/docbook45.rb
+    lib/orm_asciidoctor/backends/html5.rb
+    lib/orm_asciidoctor/backends/htmlbook.rb
+    lib/orm_asciidoctor/block.rb
+    lib/orm_asciidoctor/callouts.rb
+    lib/orm_asciidoctor/cli/invoker.rb
+    lib/orm_asciidoctor/cli/options.rb
+    lib/orm_asciidoctor/debug.rb
+    lib/orm_asciidoctor/document.rb
+    lib/orm_asciidoctor/helpers.rb
+    lib/orm_asciidoctor/inline.rb
+    lib/orm_asciidoctor/lexer.rb
+    lib/orm_asciidoctor/list_item.rb
+    lib/orm_asciidoctor/path_resolver.rb
+    lib/orm_asciidoctor/reader.rb
+    lib/orm_asciidoctor/renderer.rb
+    lib/orm_asciidoctor/section.rb
+    lib/orm_asciidoctor/substituters.rb
+    lib/orm_asciidoctor/table.rb
+    lib/orm_asciidoctor/version.rb
     man/asciidoctor.1
     man/asciidoctor.adoc
     test/attributes_test.rb

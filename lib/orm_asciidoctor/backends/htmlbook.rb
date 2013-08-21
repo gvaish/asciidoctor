@@ -1,4 +1,4 @@
-require 'asciidoctor/backends/_stylesheets'
+require 'orm_asciidoctor/backends/_stylesheets'
 
 module Asciidoctor
 class BaseTemplate
@@ -14,7 +14,7 @@ class BaseTemplate
   end
 end
 
-module HTML5
+module HTMLBook
 
 class DocumentTemplate < BaseTemplate
   def self.outline(node, to_depth = 2)
@@ -27,15 +27,17 @@ class DocumentTemplate < BaseTemplate
       if sec_level == 0 && sections.first.special
         sec_level = 1
       end
-      toc_level = %(<ul class="sectlevel#{sec_level}">\n)
+      toc_level = %(<ol style="list-style-type:none">\n)
       sections.each do |section|
         section_num = section.numbered ? %(#{section.sectnum} ) : nil
-        toc_level = %(#{toc_level}<li><a href=\"##{section.id}\">#{section_num}#{section.captioned_title}</a></li>\n)
+        toc_level = %(#{toc_level}<li><a href=\"##{section.id}\">#{section_num}#{section.captioned_title}</a>)
         if section.level < to_depth && (child_toc_level = outline(section, to_depth))
-          toc_level = %(#{toc_level}<li>\n#{child_toc_level}\n</li>\n)
+          toc_level = %(#{toc_level}\n#{child_toc_level}\n</li>\n)
+        else
+          toc_level = %(#{toc_level}</li>\n)
         end
       end
-      toc_level = %(#{toc_level}</ul>)
+      toc_level = %(#{toc_level}</ol>)
     end
     toc_level
   end
@@ -60,7 +62,7 @@ if DEFAULT_STYLESHEET_KEYS.include?(attr 'stylesheet')
 <link rel="stylesheet" href="<%= normalize_web_path(DEFAULT_STYLESHEET_NAME, (attr :stylesdir, '')) %>"><%
   else %>
 <style>
-<%= ::Asciidoctor::HTML5.default_asciidoctor_stylesheet %>
+<%= ::Asciidoctor::HTMLBook.default_asciidoctor_stylesheet %>
 </style><%
   end
 elsif attr? :stylesheet
@@ -86,7 +88,7 @@ when 'coderay'
 <link rel="stylesheet" href="<%= normalize_web_path('asciidoctor-coderay.css', (attr :stylesdir, '')) %>"><%
     else %>
 <style>
-<%= ::Asciidoctor::HTML5.default_coderay_stylesheet %>
+<%= ::Asciidoctor::HTMLBook.default_coderay_stylesheet %>
 </style><%
     end
   end
@@ -542,6 +544,18 @@ class BlockSidebarTemplate < BaseTemplate
   end
 end
 
+class BlockLatexmathTemplate < BaseTemplate
+  def template
+    @template ||= @eruby.new <<-EOS
+<%#encoding:UTF-8%><div data-type="equation">
+<p data-type="tex">
+<%= content %>
+</p>
+</div>
+    EOS
+  end
+end
+
 class BlockExampleTemplate < BaseTemplate
   def template
     @template ||= @eruby.new <<-EOS
@@ -871,6 +885,14 @@ class InlineBreakTemplate < BaseTemplate
   end
 end
 
+class InlineLatexmathTemplate < BaseTemplate
+  def template
+    @template ||= @eruby.new <<-EOS
+<%#encoding:UTF-8%><span data-type="tex"><%= %(#{text}) %></span>
+    EOS
+  end
+end
+
 class InlineCalloutTemplate < BaseTemplate
   def result(node)
     if node.document.attr? 'icons', 'font'
@@ -1022,15 +1044,27 @@ end %>
   end
 end
 
-class InlineIndextermTemplate < BaseTemplate
-  def result(node)
-    node.type == :visible ? node.text : ''
-  end
+#class InlineIndextermTemplate < BaseTemplate
+#  def result(node)
+#    node.type == :visible ? node.text : ''
+#  end
+#
+#  def template
+#    :invoke_result
+#  end
+#end
 
+class InlineIndextermTemplate < BaseTemplate
   def template
-    :invoke_result
+    @template ||= @eruby.new <<-EOS
+<%#encoding:UTF-8%><% terms = (attr :terms); numterms = terms.size %><%
+if numterms > 2 %><a data-type="indexterm" data-primary="<%= terms[0] %>" data-secondary="<%= terms[1] %>" data-tertiary="<%= terms[2] %>"></a>
+<% end %><%
+if numterms > 1 %><a data-type="indexterm" data-primary="<%= terms[-2] %>" data-secondary="<%= terms[-1] %>"></a>
+<% end %><a data-type="indexterm" data-primary="<%= terms[-1] %>"></a>
+    EOS
   end
 end
 
-end # module HTML5
+end # module HTMLBook
 end # module Asciidoctor

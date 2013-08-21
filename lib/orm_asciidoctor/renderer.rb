@@ -18,10 +18,10 @@ class Renderer
 
     backend = options[:backend]
     case backend
-    when 'html5', 'docbook45'
+    when 'html5', 'docbook45', 'htmlbook'
       eruby = load_eruby options[:eruby]
-      #Helpers.require_library 'asciidoctor/backends/' + backend
-      require 'asciidoctor/backends/' + backend
+      #Helpers.require_library 'orm_asciidoctor/backends/' + backend
+      require 'orm_asciidoctor/backends/' + backend
       # Load up all the template classes that we know how to render for this backend
       BaseTemplate.template_classes.each do |tc|
         if tc.to_s.downcase.include?('::' + backend + '::') # optimization
