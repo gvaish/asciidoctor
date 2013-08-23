@@ -241,7 +241,8 @@ module Substituters
         passthrough_text = pass[:text]
 
           # set up xslt
-          stylesheet_file = LibXML::XML::Document.file('../../../../docbook2htmlbook/db2htmlbook.xsl')
+#          stylesheet_file = LibXML::XML::Document.file('../../../../docbook2htmlbook/db2htmlbook.xsl')
+          stylesheet_file = LibXML::XML::Document.file('/Users/sarahs/Desktop/HTMLBook/docbook2htmlbook/db2htmlbook.xsl')
           xslt = LibXSLT::XSLT::Stylesheet.new(stylesheet_file)
 
           # set up xml

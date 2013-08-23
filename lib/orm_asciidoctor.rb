@@ -418,7 +418,7 @@ module Asciidoctor
 
     # inline link macro
     # link:path[label]
-    :link_macro       => /\\?(?:link|mailto):([^\s\[]+)(?:\[((?:\\\]|[^\]])*?)\])/,
+    :link_macro       => /\\?(?:link|mailto):(?:\${2})([^\s\[]+)(?:\${2})(?:\[((?:[\\]\]|[^\]])*?)\])/,
 
     # inline email address
     # doc.writer@asciidoc.org
@@ -446,7 +446,7 @@ module Asciidoctor
     # +++text+++
     # $$text$$
     # pass:quotes[text]
-    :pass_macro       => /\\?(?:(\+{3}|\${2})(.*?)\1|pass:([a-z,]*)\[((?:\\\]|[^\]])*?)\])/m,
+    :pass_macro       => /\\?(?:[^link:](\+{3}|\${2})(.*?)\1|pass:([a-z,]*)\[((?:\\\]|[^\]])*?)\])/m,
 
     # passthrough macro allowed in value of attribute assignment
     # pass:[text]
