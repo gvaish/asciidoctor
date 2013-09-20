@@ -41,6 +41,7 @@ class Section < AbstractBlock
   # parent - The parent Asciidoc Object.
   def initialize(parent = nil, level = nil, numbered = true)
     super(parent, :section)
+    @template_name = 'section'
     if level.nil?
       if !parent.nil?
         @level = parent.level + 1
@@ -80,43 +81,31 @@ class Section < AbstractBlock
   #   another_section.title = "Foo"
   #   another_section.generate_id
   #   => "_foo_1"
+  #
+  #   yet_another_section = Section.new(parent)
+  #   yet_another_section.title = "Ben & Jerry"
+  #   yet_another_section.generate_id
+  #   => "_ben_jerry"
   def generate_id
-    if @document.attr? 'sectids'
-      separator = @document.attr('idseparator', '_')
-      # FIXME define constants for these regexps
-      base_id = @document.attr('idprefix', '_') + title.downcase.gsub(/&#[0-9]+;/, separator).
-          gsub(/\W+/, separator).tr_s(separator, separator).chomp(separator)
+    if @document.attributes.has_key? 'sectids'
+      sep = @document.attributes['idseparator'] || '_'
+      pre = @document.attributes['idprefix'] || '_'
+      base_id = %(#{pre}#{title.downcase.gsub(REGEXP[:illegal_sectid_chars], sep).tr_s(sep, sep).chomp(sep)})
+      # ensure id doesn't begin with idprefix if requested it doesn't
+      if pre.empty? && base_id.start_with?(sep)
+        base_id = base_id[1..-1]
+        base_id = base_id[1..-1] while base_id.start_with?(sep)
+      end
       gen_id = base_id
       cnt = 2
-      while @document.references[:ids].has_key? gen_id 
-        gen_id = "#{base_id}#{separator}#{cnt}" 
+      while @document.references[:ids].has_key? gen_id
+        gen_id = "#{base_id}#{sep}#{cnt}"
         cnt += 1
       end 
       gen_id
     else
       nil
     end
-  end
-
-  # Public: Get the rendered String content for this Section and all its child
-  # Blocks.
-  def render
-    @document.playback_attributes @attributes
-    renderer.render('section', self)
-  end
-
-  # Public: Get the String section content by aggregating rendered section blocks.
-  #
-  # Examples
-  #
-  #   section = Section.new
-  #   section << 'foo'
-  #   section << 'bar'
-  #   section << 'baz'
-  #   section.content
-  #   "<div class=\"paragraph\"><p>foo</p></div>\n<div class=\"paragraph\"><p>bar</p></div>\n<div class=\"paragraph\"><p>baz</p></div>"
-  def content
-    @blocks.map {|b| b.render }.join
   end
 
   # Public: Get the section number for the current Section
@@ -168,6 +157,20 @@ class Section < AbstractBlock
       "#{@parent.sectnum(delimiter)}#{@number}#{append}"
     else
       "#{@number}#{append}"
+    end
+  end
+
+  # Public: Append a content block to this block's list of blocks.
+  #
+  # If the child block is a Section, assign an index to it.
+  #
+  # block - The child Block to append to this parent Block
+  #
+  # Returns nothing.
+  def <<(block)
+    super
+    if block.context == :section
+      assign_index block
     end
   end
 

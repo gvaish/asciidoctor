@@ -163,12 +163,12 @@ context 'Invoker' do
     end
   end
 
-  test 'should copy default css to target directory if linkcss and copycss are specified' do
+  test 'should copy default css to target directory if linkcss is specified' do
     sample_outpath = File.expand_path(File.join(File.dirname(__FILE__), 'fixtures', 'sample-output.html'))
     asciidoctor_stylesheet = File.expand_path(File.join(File.dirname(__FILE__), 'fixtures', 'asciidoctor.css'))
     coderay_stylesheet = File.expand_path(File.join(File.dirname(__FILE__), 'fixtures', 'asciidoctor-coderay.css'))
     begin
-      invoker = invoke_cli %W(-o #{sample_outpath} -a linkcss -a copycss -a source-highlighter=coderay)
+      invoker = invoke_cli %W(-o #{sample_outpath} -a linkcss -a source-highlighter=coderay)
       invoker.document
       assert File.exist?(sample_outpath)
       assert File.exist?(asciidoctor_stylesheet)
@@ -180,7 +180,7 @@ context 'Invoker' do
     end
   end
 
-  test 'should not copy default css to target directory if linkcss is set and copycss is not' do
+  test 'should not copy default css to target directory if linkcss is set and copycss is unset' do
     sample_outpath = File.expand_path(File.join(File.dirname(__FILE__), 'fixtures', 'sample-output.html'))
     default_stylesheet = File.expand_path(File.join(File.dirname(__FILE__), 'fixtures', 'asciidoctor.css'))
     begin
@@ -266,7 +266,7 @@ context 'Invoker' do
     assert_equal 'docbook45', doc.attr('backend')
     assert_equal '.xml', doc.attr('outfilesuffix')
     output = invoker.read_output
-    assert_xpath '/article', output, 1
+    assert_xpath '/xmlns:article', output, 1
   end
 
   test 'should set doctype to article if specified' do
@@ -394,10 +394,10 @@ context 'Invoker' do
       require 'open3'
       #cmd = "#{executable} -o - --trace #{input_path}"
       cmd = "#{File.join RbConfig::CONFIG['bindir'], RbConfig::CONFIG['ruby_install_name']} #{executable} -o - --trace #{input_path}"
-      _, stdout, stderr = Open3.popen3 cmd
-      stderr_lines = stderr.readlines
-      puts stderr_lines.join unless stderr_lines.empty?
-      assert stderr_lines.empty?, 'Command failed. Expected to receive a rendered document.'
+      _, stdout, _ = Open3.popen3 cmd
+      #stderr_lines = stderr.readlines
+      # warnings may be issued, so don't assert on stderr
+      #assert stderr_lines.empty?, 'Command failed. Expected to receive a rendered document.'
       stdout_lines = stdout.readlines
       assert !stdout_lines.empty?
       if Asciidoctor::FORCE_ENCODING

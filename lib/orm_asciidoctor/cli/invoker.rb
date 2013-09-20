@@ -67,10 +67,12 @@ module Asciidoctor
             tofile = (@out || $stdout)
           elsif !outfile.nil?
             tofile = outfile
+            opts[:mkdirs] = true
           else
             tofile = nil
             # automatically calculate outfile based on infile
             opts[:in_place] = true unless opts.has_key? :to_dir
+            opts[:mkdirs] = true
           end
 
           original_opts = opts
@@ -85,10 +87,11 @@ module Asciidoctor
 
             if profile
               monitor = opts[:monitor]
-              puts "Input file: #{input.respond_to?(:path) ? input.path : '-'}"
-              puts "  Time to read and parse source: #{'%05.5f' % monitor[:parse]}"
-              puts "  Time to render document: #{'%05.5f' % monitor[:render]}"
-              puts "  Total time to read, parse and render: #{'%05.5f' % monitor[:load_render]}"
+              err = (@err || $stderr)
+              err.puts "Input file: #{input.respond_to?(:path) ? input.path : '-'}"
+              err.puts "  Time to read and parse source: #{'%05.5f' % monitor[:parse]}"
+              err.puts "  Time to render document: #{monitor.has_key?(:render) ? '%05.5f' % monitor[:render] : 'n/a'}"
+              err.puts "  Total time to read, parse and render: #{'%05.5f' % (monitor[:load_render] || monitor[:parse])}"
             end
           end
         rescue Exception => e

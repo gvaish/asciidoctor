@@ -18,6 +18,11 @@ context 'Sections' do
       assert_equal '_section_one', sec.id
     end
 
+    test 'synthetic id removes entities' do
+      sec = block_from_string('== Ben & Jerry &#34;Ice Cream Brothers&#34;')
+      assert_equal '_ben_jerry_ice_cream_brothers', sec.id
+    end
+
     test 'synthetic id prefix can be customized' do
       sec = block_from_string(":idprefix: id_\n\n== Section One")
       assert_equal 'id_section_one', sec.id
@@ -26,6 +31,11 @@ context 'Sections' do
     test 'synthetic id prefix can be set to blank' do
       sec = block_from_string(":idprefix:\n\n== Section One")
       assert_equal 'section_one', sec.id
+    end
+
+    test 'synthetic id prefix is stripped from beginning of id if set to blank' do
+      sec = block_from_string(":idprefix:\n\n== & More")
+      assert_equal 'more', sec.id
     end
 
     test 'synthetic id separator can be customized' do
@@ -95,6 +105,20 @@ text
       chars = "=" * (title.length - 1)
       assert_xpath "//h1[not(@id)][text() = 'My Title']", render_string(title + "\n" + chars)
       assert_xpath "//h1[not(@id)][text() = 'My Title']", render_string(title + "\n" + chars + "\n")
+    end
+
+    test 'document title with multiline syntax and unicode characters' do
+      input = <<-EOS
+AsciiDoc Writer’s Guide
+=======================
+Author Name
+
+preamble
+      EOS
+
+      result = render_string input
+      assert_xpath '//h1', result, 1
+      assert_xpath '//h1[text()="AsciiDoc Writer’s Guide"]', result, 1
     end
 
     test "not enough chars for a multiline document title" do
@@ -402,7 +426,7 @@ text in standalone
       output, errors = nil
       redirect_streams do |stdout, stderr|
         output = render_string input
-        errors = stdout.string
+        errors = stderr.string
       end
 
       assert !errors.empty?
@@ -1467,11 +1491,54 @@ They couldn't believe their eyes when...
       assert_xpath '//*[@id="header"]//*[@id="toc"]/ul/li[1]/a[@href="#_section_one"][text()="1. Section One"]', output, 1
     end
 
-    test 'should set toc position if toc-position attribute is set' do
+    test 'should set toc position if toc and toc-position attributes are set' do
+      input = <<-EOS
+= Article
+:toc:
+:toc-position: right
+:numbered:
+
+== Section One
+
+It was a dark and stormy night...
+
+== Section Two
+
+They couldn't believe their eyes when...
+      EOS
+
+      output = render_string input
+      assert_xpath '//body[@class="article toc2 toc-right"]', output, 1
+      assert_xpath '//*[@id="header"]//*[@id="toc"][@class="toc2"]', output, 1
+      assert_xpath '//*[@id="header"]//*[@id="toc"]/ul/li[1]/a[@href="#_section_one"][text()="1. Section One"]', output, 1
+    end
+
+    test 'should set toc position if toc2 and toc-position attribute are set' do
       input = <<-EOS
 = Article
 :toc2:
 :toc-position: right
+:numbered:
+
+== Section One
+
+It was a dark and stormy night...
+
+== Section Two
+
+They couldn't believe their eyes when...
+      EOS
+
+      output = render_string input
+      assert_xpath '//body[@class="article toc2 toc-right"]', output, 1
+      assert_xpath '//*[@id="header"]//*[@id="toc"][@class="toc2"]', output, 1
+      assert_xpath '//*[@id="header"]//*[@id="toc"]/ul/li[1]/a[@href="#_section_one"][text()="1. Section One"]', output, 1
+    end
+
+    test 'should set toc position if toc attribute is set to direction' do
+      input = <<-EOS
+= Article
+:toc: right
 :numbered:
 
 == Section One

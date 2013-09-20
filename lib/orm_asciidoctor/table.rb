@@ -125,16 +125,6 @@ class Table < AbstractBlock
     
     nil
   end
-
-  # Public: Get the rendered String content for this Block.  If the block
-  # has child blocks, the content method should cause them to be
-  # rendered and returned as content that can be included in the
-  # parent block's template.
-  def render
-    @document.playback_attributes @attributes
-    renderer.render('block_table', self) 
-  end
-
 end
 
 # Public: A struct that encapsulates the collection of rows (head, foot, body) for a table
@@ -196,7 +186,7 @@ class Table::Cell < AbstractNode
   # Public: The internal Asciidoctor::Document for a cell that has the asciidoc style
   attr_reader :inner_document
 
-  def initialize(column, text, attributes = {})
+  def initialize(column, text, attributes = {}, cursor = nil)
     super(column, :cell)
     @text = text
     @style = nil
@@ -220,7 +210,19 @@ class Table::Cell < AbstractNode
       # FIXME hide doctitle from nested document; temporary workaround to fix
       # nested document seeing doctitle and assuming it has its own document title
       parent_doctitle = @document.attributes.delete('doctitle')
-      @inner_document = Document.new(@text, :header_footer => false, :parent => @document)
+      # NOTE we need to process the first line of content as it may not have been processed
+      # the included content cannot expect to match conditional terminators in the remaining
+      # lines of table cell content, it must be self-contained logic
+      inner_document_lines = @text.each_line.to_a
+      unless inner_document_lines.empty? || !inner_document_lines.first.include?('::')
+        unprocessed_lines = inner_document_lines[0..0]
+        processed_lines = PreprocessorReader.new(@document, unprocessed_lines).readlines
+        if processed_lines != unprocessed_lines
+          inner_document_lines.shift
+          inner_document_lines.unshift(*processed_lines)
+        end
+      end
+      @inner_document = Document.new(inner_document_lines, :header_footer => false, :parent => @document, :cursor => cursor)
       @document.attributes['doctitle'] = parent_doctitle unless parent_doctitle.nil?
     end
   end
@@ -276,8 +278,11 @@ class Table::ParserContext
   # Public: The cell delimiter compiled Regexp for this table.
   attr_reader :delimiter_re
 
-  def initialize(table, attributes = {})
+  def initialize(reader, table, attributes = {})
+    @reader = reader
     @table = table
+    # TODO if reader.cursor becomes a reference, this would require .dup
+    @last_cursor = reader.cursor
     if attributes.has_key? 'format'
       @format = attributes['format']
       if !Table::DATA_FORMATS.include? @format
@@ -420,7 +425,7 @@ class Table::ParserContext
     if format == 'psv'
       cell_spec = take_cell_spec
       if cell_spec.nil?
-        puts 'asciidoctor: ERROR: table missing leading separator, recovering automatically'
+        warn "asciidoctor: ERROR: #{@last_cursor.line_info}: table missing leading separator, recovering automatically"
         cell_spec = {}
         repeat = 1
       else
@@ -454,7 +459,8 @@ class Table::ParserContext
         column = @table.columns[@current_row.size]
       end
 
-      cell = Table::Cell.new(column, cell_text, cell_spec)
+      cell = Table::Cell.new(column, cell_text, cell_spec, @last_cursor)
+      @last_cursor = @reader.cursor
       unless cell.rowspan.nil? || cell.rowspan == 1
         activate_rowspan(cell.rowspan, (cell.colspan || 1))
       end
