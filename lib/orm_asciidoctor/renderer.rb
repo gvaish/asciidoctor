@@ -2,6 +2,11 @@ module Asciidoctor
 # Public: Methods for rendering Asciidoc Documents, Sections, and Blocks
 # using eRuby templates.
 class Renderer
+  RE_ASCIIDOCTOR_NAMESPACE = /^Asciidoctor::/
+  RE_TEMPLATE_CLASS_SUFFIX = /Template$/
+  RE_CAMELCASE_BOUNDARY_1 = /([[:upper:]]+)([[:upper:]][[:alpha:]])/
+  RE_CAMELCASE_BOUNDARY_2 = /([[:lower:]])([[:upper:]])/
+
   attr_reader :compact
   attr_reader :cache
 
@@ -18,7 +23,7 @@ class Renderer
 
     backend = options[:backend]
     case backend
-    when 'html5', 'docbook45', 'htmlbook'
+    when 'html5', 'docbook45', 'docbook5', 'htmlbook'
       eruby = load_eruby options[:eruby]
       #Helpers.require_library 'orm_asciidoctor/backends/' + backend
       require 'orm_asciidoctor/backends/' + backend
@@ -27,7 +32,7 @@ class Renderer
         if tc.to_s.downcase.include?('::' + backend + '::') # optimization
           view_name, view_backend = self.class.extract_view_mapping(tc)
           if view_backend == backend
-            @views[view_name] = tc.new(view_name, eruby)
+            @views[view_name] = tc.new(view_name, backend, eruby)
           end
         end
       end
@@ -138,6 +143,11 @@ class Renderer
     readonly_views
   end
 
+  def register_view(view_name, tilt_template)
+    # TODO need to figure out how to cache this
+    @views[view_name] = tilt_template
+  end
+
   # Internal: Load the eRuby implementation
   #
   # name - the String name of the eRuby implementation (default: 'erb')
@@ -187,8 +197,8 @@ class Renderer
   # Returns A two-element String Array mapped as [view_name, backend], where backend may be nil
   def self.extract_view_mapping(qualified_class)
     view_name, backend = qualified_class.to_s.
-        gsub(/^Asciidoctor::/, '').
-        gsub(/Template$/, '').
+        sub(RE_ASCIIDOCTOR_NAMESPACE, '').
+        sub(RE_TEMPLATE_CLASS_SUFFIX, '').
         split('::').reverse
     view_name = camelcase_to_underscore(view_name)
     backend = backend.downcase unless backend.nil?
@@ -207,8 +217,8 @@ class Renderer
   #
   # Returns the String converted from CamelCase to underscore-delimited
   def self.camelcase_to_underscore(str)
-    str.gsub(/([[:upper:]]+)([[:upper:]][[:alpha:]])/, '\1_\2').
-        gsub(/([[:lower:]])([[:upper:]])/, '\1_\2').downcase
+    str.gsub(RE_CAMELCASE_BOUNDARY_1, '\1_\2').
+        gsub(RE_CAMELCASE_BOUNDARY_2, '\1_\2').downcase
   end
 
 end

@@ -6,8 +6,8 @@ Gem::Specification.new do |s|
   ## name, version, date and rubyforge_project are updated automatically by the
   ## Rake build (see the validate task)
   s.name              = 'orm_asciidoctor'
-  s.version           = '0.0.0'
-  s.date              = '2013-07-29'
+  s.version           = '0.5.0'
+  s.date              = '2013-09-19'
   ## s.rubyforge_project = 'asciidoctor'
 
   s.summary     = 'ORM fork of asciidoctor, a native Ruby AsciiDoc syntax processor and publishing toolchain'
@@ -23,7 +23,7 @@ EOS
 
 ##  s.has_rdoc = true
 ##  s.rdoc_options = ['--charset=UTF-8']
-##  s.extra_rdoc_files = %w[LICENSE]
+##  s.extra_rdoc_files = %w[LICENSE CHANGELOG.adoc]
 
   ## List your runtime dependencies here. Runtime dependencies are those
   ## that are needed for an end user to actually USE your code.
@@ -46,6 +46,7 @@ EOS
   ## DO NOT REMOVE THE = MANIFEST = DELIMITERS!
   # = MANIFEST =
   s.files = %w[
+    CHANGELOG.adoc
     Gemfile
     Guardfile
     LICENSE
@@ -62,6 +63,7 @@ EOS
     lib/orm_asciidoctor/backends/_stylesheets.rb
     lib/orm_asciidoctor/backends/base_template.rb
     lib/orm_asciidoctor/backends/docbook45.rb
+    lib/orm_asciidoctor/backends/docbook5.rb
     lib/orm_asciidoctor/backends/html5.rb
     lib/orm_asciidoctor/backends/htmlbook.rb
     lib/orm_asciidoctor/block.rb
@@ -86,12 +88,16 @@ EOS
     test/attributes_test.rb
     test/blocks_test.rb
     test/document_test.rb
+    test/extensions_test.rb
     test/fixtures/asciidoc.txt
     test/fixtures/asciidoc_index.txt
     test/fixtures/ascshort.txt
+    test/fixtures/basic-docinfo-footer.html
+    test/fixtures/basic-docinfo-footer.xml
     test/fixtures/basic-docinfo.html
     test/fixtures/basic-docinfo.xml
     test/fixtures/basic.asciidoc
+    test/fixtures/child-include.adoc
     test/fixtures/custom-backends/haml/docbook45/block_paragraph.xml.haml
     test/fixtures/custom-backends/haml/html5-tweaks/block_paragraph.html.haml
     test/fixtures/custom-backends/haml/html5/block_paragraph.html.haml
@@ -99,12 +105,17 @@ EOS
     test/fixtures/custom-backends/slim/docbook45/block_paragraph.xml.slim
     test/fixtures/custom-backends/slim/html5/block_paragraph.html.slim
     test/fixtures/custom-backends/slim/html5/block_sidebar.html.slim
+    test/fixtures/docinfo-footer.html
+    test/fixtures/docinfo-footer.xml
     test/fixtures/docinfo.html
     test/fixtures/docinfo.xml
     test/fixtures/dot.gif
     test/fixtures/encoding.asciidoc
+    test/fixtures/grandchild-include.adoc
     test/fixtures/include-file.asciidoc
     test/fixtures/list_elements.asciidoc
+    test/fixtures/parent-include-restricted.adoc
+    test/fixtures/parent-include.adoc
     test/fixtures/sample.asciidoc
     test/fixtures/stylesheets/custom.css
     test/fixtures/tip.gif

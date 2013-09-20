@@ -22,12 +22,10 @@ module Helpers
       require name
     rescue LoadError => e
       if gem_name
-        puts "asciidoctor: FAILED: required gem '#{gem_name === true ? name : gem_name}' is not installed"
+        fail "asciidoctor: FAILED: required gem '#{gem_name === true ? name : gem_name}' is not installed. Processing aborted."
       else
-        puts "asciidoctor: FAILED: #{e}"
+        fail "asciidoctor: FAILED: #{e.chomp '.'}. Processing aborted."
       end
-      # QUESTION: raise abort error or use exit code return value?
-      raise 'Processing aborted'
     end
   end
 
@@ -44,6 +42,25 @@ module Helpers
         buf << sprintf('%%%02X', c)
       end
       buf
+    end
+  end
+
+  # Public: Removes the file extension from filename and returns the result
+  #
+  # file_name - The String file name to process
+  #
+  # Examples
+  #
+  #   Helpers.rootname('part1/chapter1.adoc')
+  #   # => "part1/chapter1"
+  #
+  # Returns the String filename with the file extension removed
+  def self.rootname(file_name)
+    ext = File.extname(file_name)
+    if ext.empty?
+      file_name
+    else
+      file_name[0...-ext.length]
     end
   end
 
@@ -66,10 +83,5 @@ module Helpers
     end
     clone
   end
-
-  # Public: A generic capture output routine to be used in templates
-  #def self.capture_output(*args, &block)
-  #  Proc.new { block.call(*args) }
-  #end
 end
 end

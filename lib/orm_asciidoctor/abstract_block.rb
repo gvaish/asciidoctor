@@ -1,5 +1,14 @@
 module Asciidoctor
 class AbstractBlock < AbstractNode
+  # Public: The types of content that this block can accomodate
+  attr_accessor :content_model
+
+  # Public: Substitutions to be applied to content in this block
+  attr_reader :subs
+
+  # Public: Get/Set the String name of the render template
+  attr_accessor :template_name
+
   # Public: Get the Array of Asciidoctor::AbstractBlock sub-blocks for this block
   attr_reader :blocks
 
@@ -17,6 +26,9 @@ class AbstractBlock < AbstractNode
 
   def initialize(parent, context)
     super(parent, context)
+    @content_model = :compound
+    @subs = []
+    @template_name = "block_#{context}"
     @blocks = []
     @id = nil
     @title = nil
@@ -31,6 +43,32 @@ class AbstractBlock < AbstractNode
     end
     @next_section_index = 0
     @next_section_number = 1
+  end
+
+  # Public: Get the rendered String content for this Block.  If the block
+  # has child blocks, the content method should cause them to be
+  # rendered and returned as content that can be included in the
+  # parent block's template.
+  def render
+    @document.playback_attributes @attributes
+    renderer.render(@template_name, self)
+  end
+
+  # Public: Get an rendered version of the block content, rendering the
+  # children appropriate to content model that this block supports.
+  def content
+    @blocks.map {|b| b.render } * EOL
+  end
+
+  # Public: A convenience method that checks whether the specified
+  # substitution is enabled for this block.
+  #
+  # name - The Symbol substitution name
+  #
+  # Returns A Boolean indicating whether the specified substitution is
+  # enabled for this block
+  def sub? name
+    @subs.include? name
   end
 
   # Public: A convenience method that indicates whether the title instance
@@ -79,28 +117,9 @@ class AbstractBlock < AbstractNode
 
   # Public: Determine whether this Block contains block content
   #
-  # returns Whether this Block has block content
-  #
-  #--
-  # TODO we still need another method that answers
-  # whether this Block *can* have block content
-  # that should be the option 'sectionbody'
+  # Returns A Boolean indicating whether this Block has block content
   def blocks?
     !@blocks.empty?
-  end
-
-  # Public: Get the element at i in the array of blocks.
-  #
-  # i - The Integer array index number.
-  #
-  #   section = Section.new
-  #
-  #   section << 'foo'
-  #   section << 'bar'
-  #   section[1]
-  #   => "bar"
-  def [](i)
-    @blocks[i]
   end
 
   # Public: Append a content block to this block's list of blocks.
@@ -109,86 +128,20 @@ class AbstractBlock < AbstractNode
   #
   # Examples
   #
-  #   block = Block.new(parent, :preamble)
+  #   block = Block.new(parent, :preamble, :content_model => :compound)
   #
-  #   block << Block.new(block, :paragraph, 'p1')
-  #   block << Block.new(block, :paragraph, 'p2')
-  #   block.blocks
-  #   # => ["p1", "p2"]
+  #   block << Block.new(block, :paragraph, :source => 'p1')
+  #   block << Block.new(block, :paragraph, :source => 'p2')
+  #   block.blocks?
+  #   # => true
+  #   block.blocks.size
+  #   # => 2
   #
   # Returns nothing.
   def <<(block)
-    if block.is_a?(Section)
-      assign_index(block)
-    end
+    # parent assignment pending refactor
+    #block.parent = self
     @blocks << block
-  end
-
-  # Public: Insert a content block at the specified index in this block's
-  # list of blocks.
-  #
-  # i - The Integer array index number.
-  # val = The content block to insert.
-  #
-  #   section = Section.new
-  #
-  #   section << 'foo'
-  #   section << 'baz'
-  #   section.insert(1, 'bar')
-  #   section.blocks
-  #   ["foo", "bar", "baz"]
-  def insert(i, block)
-    @blocks.insert(i, block)
-  end
-
-  # Public: Delete the element at i in the array of section blocks,
-  # returning that element or nil if i is out of range.
-  #
-  # i - The Integer array index number.
-  #
-  #   section = Section.new
-  #
-  #   section << 'foo'
-  #   section << 'bar'
-  #   section.delete_at(1)
-  #   => "bar"
-  #
-  #   section.blocks
-  #   => ["foo"]
-  def delete_at(i)
-    @blocks.delete_at(i)
-  end
-
-  # Public: Clear this Block's list of blocks.
-  #
-  #   section = Section.new
-  #
-  #   section << 'foo'
-  #   section << 'bar'
-  #   section.blocks
-  #   => ["foo", "bar"]
-  #   section.clear_blocks
-  #   section.blocks
-  #   => []
-  def clear_blocks
-    @blocks = []
-  end
-
-  # Public: Get the Integer number of blocks in this block
-  #
-  # Examples
-  #
-  #   section = Section.new
-  #
-  #   section.size
-  #   => 0
-  #
-  #   section << 'foo'
-  #   section << 'bar'
-  #   section.size
-  #   => 2
-  def size
-    @blocks.size
   end
 
   # Public: Get the Array of child Section objects
@@ -198,9 +151,13 @@ class AbstractBlock < AbstractNode
   # Examples
   # 
   #   section = Section.new(parent)
-  #   section << Block.new(section, :paragraph, 'paragraph 1')
+  #   section << Block.new(section, :paragraph, :source => 'paragraph 1')
   #   section << Section.new(parent)
-  #   section << Block.new(section, :paragraph, 'paragraph 2')
+  #   section << Block.new(section, :paragraph, :source => 'paragraph 2')
+  #   section.blocks?
+  #   # => true
+  #   section.blocks.size
+  #   # => 3
   #   section.sections.size
   #   # => 1
   #
@@ -210,6 +167,55 @@ class AbstractBlock < AbstractNode
       collector << block if block.is_a?(Section)
       collector
     }
+  end
+
+  # Internal: Lock-in the substitutions for this block
+  #
+  # Looks for an attribute named "subs". If present, resolves the
+  # substitutions and assigns it to the subs property on this block.
+  # Otherwise, assigns a set of default substitutions based on the
+  # content model of the block.
+  #
+  # Returns nothing
+  def lock_in_subs
+    default_subs = []
+    case @content_model
+    when :simple
+      default_subs = SUBS[:normal]
+    when :verbatim
+      if @context == :listing || (@context == :literal && !(option? 'listparagraph'))
+        default_subs = SUBS[:verbatim]
+      else
+        default_subs = SUBS[:basic]
+      end
+    when :raw
+      default_subs = SUBS[:pass]
+    else
+      return
+    end
+
+    if (custom_subs = @attributes['subs'])
+      @subs = resolve_block_subs custom_subs, @context
+    else
+      @subs = default_subs.dup
+    end
+
+    # QUESION delegate this logic to method?
+    if @context == :listing && @style == 'source' && (@document.basebackend? 'html') &&
+      ((highlighter = @document.attributes['source-highlighter']) == 'coderay' ||
+      highlighter == 'pygments') && (attr? 'language')
+      @subs = @subs.map {|sub| sub == :specialcharacters ? :highlight : sub }
+    end
+  end
+
+  # Public: Remove a substitution from this block
+  #
+  # sub  - The Symbol substitution name
+  #
+  # Returns nothing
+  def remove_sub sub
+    @subs.delete sub
+    nil
   end
 
   # Public: Generate a caption and assign it to this block if one
@@ -234,12 +240,12 @@ class AbstractBlock < AbstractNode
     end
 
     if caption.nil?
-      if @document.attr?('caption')
-        @caption = @document.attr('caption')
+      if @document.attributes.has_key? 'caption'
+        @caption = @document.attributes['caption']
       elsif title?
         key ||= @context.to_s
         caption_key = "#{key}-caption"
-        if @document.attributes.has_key?(caption_key)
+        if @document.attributes.has_key? caption_key
           caption_title = @document.attributes["#{key}-caption"]
           caption_num = @document.counter_increment("#{key}-number", self)
           @caption = "#{caption_title} #{caption_num}. "

@@ -63,12 +63,12 @@ context 'Attributes' do
     end
 
     test "assigns attribute to empty string if substitution fails to resolve attribute" do
-      doc = document_from_string(":release: Asciidoctor {version}")
+      doc = document_from_string ":release: Asciidoctor {version}", :attributes => { 'attribute-missing' => 'drop-line' }
       assert_equal '', doc.attributes['release']
     end
 
     test "assigns multi-line attribute to empty string if substitution fails to resolve attribute" do
-      doc = document_from_string(":release: Asciidoctor +\n          {version}")
+      doc = document_from_string ":release: Asciidoctor +\n          {version}", :attributes => { 'attribute-missing' => 'drop-line' }
       assert_equal '', doc.attributes['release']
     end
 
@@ -144,8 +144,16 @@ endif::holygrail[]
     end
 
     test 'attribute lookup is not case sensitive' do
-      result = render_embedded_string(":He-Man: The most powerful man in the universe\n\n{He-Man}")
-      assert_xpath '//p[text()="The most powerful man in the universe"]', result, 1
+      input = <<-EOS
+:He-Man: The most powerful man in the universe
+
+He-Man: {He-Man}
+
+She-Ra: {She-Ra}
+      EOS
+      result = render_embedded_string input, :attributes => {'She-Ra' => 'The Princess of Power'}
+      assert_xpath '//p[text()="He-Man: The most powerful man in the universe"]', result, 1
+      assert_xpath '//p[text()="She-Ra: The Princess of Power"]', result, 1
     end
 
     test "render properly with single character name" do
@@ -154,7 +162,7 @@ endif::holygrail[]
       assert_equal 'R is for Ruby!', result.css("p").first.content.strip
     end
 
-    test "convert multi-word names and render" do
+    test "collapses spaces in attribute names" do
       input = <<-EOS
 Main Header
 ===========
@@ -166,8 +174,15 @@ Yo, {myfrog}!
       assert_xpath '(//p)[1][text()="Yo, Tanglefoot!"]', output, 1
     end
 
-    test "ignores lines with bad attributes" do
-      html = render_string("This is\nblah blah {foobarbaz}\nall there is.")
+    test "ignores lines with bad attributes if attribute-missing is drop-line" do
+      input = <<-EOS
+:attribute-missing: drop-line
+
+This is
+blah blah {foobarbaz}
+all there is.
+      EOS
+      html = render_embedded_string input
       result = Nokogiri::HTML(html)
       assert_no_match(/blah blah/m, result.css("p").first.content.strip)
     end
@@ -179,8 +194,10 @@ Yo, {myfrog}!
       assert_xpath '//a[@href="http://google.com"][text() = "Google"]', output, 1
     end
 
-    test 'should drop line with reference to undefined attribute' do
+    test 'should drop line with reference to missing attribute if attribute-missing attribute is drop-line' do
       input = <<-EOS
+:attribute-missing: drop-line
+
 Line 1: This line should appear in the output.
 Line 2: Oh no, a {bogus-attribute}! This line should not appear in the output.
       EOS
@@ -190,10 +207,8 @@ Line 2: Oh no, a {bogus-attribute}! This line should not appear in the output.
       assert_no_match(/Line 2/, output)
     end
 
-    test 'should not drop line with reference to undefined attribute if ignore-undefined attribute is set' do
+    test 'should not drop line with reference to missing attribute by default' do
       input = <<-EOS
-:ignore-undefined:
-
 Line 1: This line should appear in the output.
 Line 2: A {bogus-attribute}! This time, this line should appear in the output.
       EOS
@@ -204,7 +219,7 @@ Line 2: A {bogus-attribute}! This time, this line should appear in the output.
       assert_match(/\{bogus-attribute\}/, output)
     end
 
-    test 'should drop line with attribute unassignment' do
+    test 'should drop line with attribute unassignment by default' do
       input = <<-EOS
 :a:
 
@@ -217,9 +232,9 @@ Line 2: {set:a!}This line should not appear in the output.
       assert_no_match(/Line 2/, output)
     end
 
-    test 'should not drop line with attribute unassignment if ignore-undefined attribute is set' do
+    test 'should not drop line with attribute unassignment if attribute-undefined is drop' do
       input = <<-EOS
-:ignore-undefined:
+:attribute-undefined: drop
 :a:
 
 Line 1: This line should appear in the output.
@@ -419,7 +434,13 @@ of the attribute named foo in your document.
     end
 
     test 'unassigns attribute defined in attribute reference with set prefix' do
-      input = ":foo:\n\n{set:foo!}\n{foo}yes"
+      input = <<-EOS
+:attribute-missing: drop-line
+:foo:
+
+{set:foo!}
+{foo}yes
+      EOS
       output = render_embedded_string input
       assert_xpath '//p', output, 1
       assert_xpath '//p/child::text()', output, 0
@@ -707,6 +728,19 @@ Text
       assert_equal 'option1,option2', para.attributes['options']
       assert para.attributes.has_key?('option1-option')
       assert para.attributes.has_key?('option2-option')
+    end
+
+    test 'option can be specified in first position of block style using shorthand syntax' do
+      input = <<-EOS
+[%interactive]
+- [x] checked
+      EOS
+
+      doc = document_from_string input
+      list = doc.blocks.first
+      assert_equal 'interactive', list.attributes['options']
+      assert list.attributes.has_key?('interactive-option')
+      assert list.attributes[1] == '%interactive'
     end
 
     test 'id and role attributes can be specified on section style using shorthand syntax' do

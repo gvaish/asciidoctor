@@ -1,24 +1,11 @@
 require 'orm_asciidoctor/backends/_stylesheets'
 
 module Asciidoctor
-class BaseTemplate
-  # create template matter to insert a style class from the role attribute if specified
-  def role_class
-    %(<%= role? ? " \#{role}" : nil %>)
-  end
-
-  # create template matter to insert a style class from the style attribute if specified
-  def style_class(sibling = true)
-    delimiter = sibling ? ' ' : ''
-    %(<%= @style && "#{delimiter}\#{@style}" %>)
-  end
-end
-
 module HTML5
 
 class DocumentTemplate < BaseTemplate
   def self.outline(node, to_depth = 2)
-    toc_level = nil
+    toc_level_buffer = []
     sections = node.sections
     unless sections.empty?
       # FIXME the level for special sections should be set correctly in the model
@@ -27,23 +14,25 @@ class DocumentTemplate < BaseTemplate
       if sec_level == 0 && sections.first.special
         sec_level = 1
       end
-      toc_level = %(<ul class="sectlevel#{sec_level}">\n)
+      toc_level_buffer << %(<ul class="sectlevel#{sec_level}">)
       sections.each do |section|
         section_num = section.numbered ? %(#{section.sectnum} ) : nil
-        toc_level = %(#{toc_level}<li><a href=\"##{section.id}\">#{section_num}#{section.captioned_title}</a></li>\n)
-        if section.level < to_depth && (child_toc_level = outline(section, to_depth))
-          toc_level = %(#{toc_level}<li>\n#{child_toc_level}\n</li>\n)
+        toc_level_buffer << %(<li><a href=\"##{section.id}\">#{section_num}#{section.captioned_title}</a></li>)
+        if section.level < to_depth && (child_toc_level = outline(section, to_depth)) != ''
+          toc_level_buffer << '<li>'
+          toc_level_buffer << child_toc_level
+          toc_level_buffer << '</li>'
         end
       end
-      toc_level = %(#{toc_level}</ul>)
+      toc_level_buffer << '</ul>'
     end
-    toc_level
+    toc_level_buffer * EOL
   end
 
   def template
     @template ||= @eruby.new <<-EOS
 <%#encoding:UTF-8%><!DOCTYPE html>
-<html<%= !(attr? 'nolang') ? %( lang="\#{attr 'lang', 'en'}") : nil %>>
+<html<%= (attr? 'nolang') ? nil : %( lang="\#{attr 'lang', 'en'}") %>>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=<%= attr :encoding %>">
 <meta name="generator" content="Asciidoctor <%= attr 'asciidoctor-version' %>">
@@ -60,7 +49,7 @@ if DEFAULT_STYLESHEET_KEYS.include?(attr 'stylesheet')
 <link rel="stylesheet" href="<%= normalize_web_path(DEFAULT_STYLESHEET_NAME, (attr :stylesdir, '')) %>"><%
   else %>
 <style>
-<%= ::Asciidoctor::HTML5.default_asciidoctor_stylesheet %>
+<%= HTML5.default_asciidoctor_stylesheet %>
 </style><%
   end
 elsif attr? :stylesheet
@@ -74,7 +63,7 @@ elsif attr? :stylesheet
 end
 if attr? 'icons', 'font'
   if !(attr 'iconfont-remote', '').nil? %>
-<link rel="stylesheet" href="<%= attr 'iconfont-cdn', 'http://cdnjs.cloudflare.com/ajax/libs/font-awesome/3.2.1/css' %>/<%= attr 'iconfont-name', 'font-awesome' %>.min.css"><%
+<link rel="stylesheet" href="<%= attr 'iconfont-cdn', 'http://cdnjs.cloudflare.com/ajax/libs/font-awesome/3.2.1/css/font-awesome.min.css' %>"><%
   else %>
 <link rel="stylesheet" href="<%= normalize_web_path(%(\#{attr 'iconfont-name', 'font-awesome'}.css), (attr 'stylesdir', '')) %>"><%
   end
@@ -86,7 +75,17 @@ when 'coderay'
 <link rel="stylesheet" href="<%= normalize_web_path('asciidoctor-coderay.css', (attr :stylesdir, '')) %>"><%
     else %>
 <style>
-<%= ::Asciidoctor::HTML5.default_coderay_stylesheet %>
+<%= HTML5.default_coderay_stylesheet %>
+</style><%
+    end
+  end
+when 'pygments'
+  if (attr 'pygments-css', 'class') == 'class'
+    if @safe >= SafeMode::SECURE || (attr? 'linkcss') %>
+<link rel="stylesheet" href="<%= normalize_web_path('asciidoctor-pygments.css', (attr :stylesdir, '')) %>"><%
+    else %>
+<style>
+<%= HTML5.pygments_stylesheet(attr 'pygments-style') %>
 </style><%
     end
   end
@@ -101,7 +100,7 @@ when 'prettify' %>
 end %><%= (docinfo_content = docinfo).empty? ? nil : %(
 \#{docinfo_content}) %>
 </head>
-<body#{id} class="<%= doctype %><%= (attr? 'toc-class') && (attr? 'toc') && (attr? 'toc-placement', 'auto') ? %( \#{attr 'toc-class'} toc-\#{attr 'toc-position'}) : nil %>"<%= (attr? 'max-width') ? %( style="max-width: \#{attr 'max-width'};") : nil %>><%
+<body<%= @id ? %( id="\#{@id}") : nil %> class="<%= doctype %><%= (attr? 'toc-class') && (attr? 'toc') && (attr? 'toc-placement', 'auto') ? %( \#{attr 'toc-class'} toc-\#{attr 'toc-position', 'left'}) : nil %>"<%= (attr? 'max-width') ? %( style="max-width: \#{attr 'max-width'};") : nil %>><%
 unless noheader %>
 <div id="header"><%
   if doctype == 'manpage' %>
@@ -169,12 +168,13 @@ end %>
 <div id="footer">
 <div id="footer-text"><%
 if attr? :revnumber %>
-<%= %(\#{attr 'version-label'} \#{attr :revnumber}) %><%
+<%= %(\#{attr 'version-label'} \#{attr :revnumber}) %><br><%
 end
 if attr? 'last-update-label' %>
 <%= %(\#{attr 'last-update-label'} \#{attr :docdatetime}) %><%
 end %>
-</div>
+</div><%= (docinfo_content = docinfo :footer).empty? ? nil : %(
+\#{docinfo_content}) %>
 </div>
 </body>
 </html>
@@ -183,19 +183,32 @@ end %>
 end
 
 class EmbeddedTemplate < BaseTemplate
+  def result(node)
+    result_buffer = []
+    if !node.notitle && node.has_header?
+      id_attr = node.id ? %( id="#{node.id}") : nil
+      result_buffer << %(<h1#{id_attr}>#{node.header.title}</h1>)
+    end
+
+    result_buffer << node.content
+
+    if node.footnotes? && !(node.attr? 'nofootnotes')
+      result_buffer << '<div id="footnotes">'
+      result_buffer << '<hr>'
+      node.footnotes.each do |footnote|
+        result_buffer << %(<div class="footnote" id="_footnote_#{footnote.index}">
+<a href="#_footnoteref_#{footnote.index}">#{footnote.index}</a> #{footnote.text}
+</div>)
+      end
+
+      result_buffer << '</div>'
+    end
+
+    result_buffer * EOL
+  end
+
   def template
-    @template ||= @eruby.new <<-EOS
-<%#encoding:UTF-8%><% unless notitle || !has_header? %><h1#{id}><%= header.title %></h1>
-<% end %><%= content %>
-<% unless !footnotes? || (attr? :nofootnotes) %><div id="footnotes">
-  <hr>
-  <% footnotes.each do |fn| %>
-  <div class="footnote" id="_footnote_<%= fn.index %>">
-    <a href="#_footnoteref_<%= fn.index %>"><%= fn.index %></a>. <%= fn.text %>
-  </div>
-  <% end %>
-</div><% end %>
-    EOS
+    :invoke_result
   end
 end
 
@@ -242,14 +255,16 @@ class BlockPreambleTemplate < BaseTemplate
     end
   end
 
-  def template
-    @template ||= @eruby.new <<-EOS
-<%#encoding:UTF-8%><div id="preamble">
+  def result(node)
+    %(<div id="preamble">
 <div class="sectionbody">
-<%= content %>
-</div><%= template.toc(self) %>
-</div>
-    EOS
+#{node.content}
+</div>#{toc node}
+</div>)
+  end
+
+  def template
+    :invoke_result
   end
 end
 
@@ -278,7 +293,7 @@ class SectionTemplate < BaseTemplate
 
     if slevel == 0
       %(<h1#{id} class="sect0">#{anchor}#{link_start}#{sec.title}#{link_end}</h1>
-#{sec.content}\n)
+#{sec.content})
     else
       role = sec.role? ? " #{sec.role}" : nil
       if sec.numbered
@@ -297,7 +312,7 @@ class SectionTemplate < BaseTemplate
       %(<div class="sect#{slevel}#{role}">
 <#{htag}#{id}>#{anchor}#{link_start}#{sectnum}#{sec.captioned_title}#{link_end}</#{htag}>
 #{content}
-</div>\n)
+</div>)
     end
   end
 
@@ -307,115 +322,103 @@ class SectionTemplate < BaseTemplate
 end
 
 class BlockFloatingTitleTemplate < BaseTemplate
+  def result(node)
+    tag_name = "h#{node.level + 1}"
+    id_attribute = node.id ? %( id="#{node.id}") : nil
+    classes = [node.style, node.role].compact
+    %(<#{tag_name}#{id_attribute} class="#{classes * ' '}">#{node.title}</#{tag_name}>)
+  end
+
   def template
-    @template ||= @eruby.new <<-EOS
-<%#encoding:UTF-8%><h<%= @level + 1 %>#{id} class="#{style_class false}#{role_class}"><%= title %></h<%= @level + 1 %>>
-    EOS
+    :invoke_result
   end
 end
 
 class BlockDlistTemplate < BaseTemplate
+  def result(node)
+    result_buffer = []
+    id_attribute = node.id ? %( id="#{node.id}") : nil
+
+    case node.style
+    when 'qanda'
+      classes = ['qlist', node.style, node.role].compact
+    when 'horizontal'
+      classes = ['hdlist', node.role].compact
+    else
+      classes = ['dlist', node.style, node.role].compact
+    end
+
+    class_attribute = %( class="#{classes * ' '}")
+
+    result_buffer << %(<div#{id_attribute}#{class_attribute}>)
+    result_buffer << %(<div class="title">#{node.title}</div>) if node.title?
+    case node.style
+    when 'qanda'
+      result_buffer << '<ol>'
+      node.items.each do |terms, dd|
+        result_buffer << '<li>'
+        [*terms].each do |dt|
+          result_buffer << %(<p><em>#{dt.text}</em></p>)
+        end
+        unless dd.nil?
+          result_buffer << %(<p>#{dd.text}</p>) if dd.text?
+          result_buffer << dd.content if dd.blocks?
+        end
+        result_buffer << '</li>'
+      end
+      result_buffer << '</ol>'
+    when 'horizontal'
+      result_buffer << '<table>'
+      if (node.attr? 'labelwidth') || (node.attr? 'itemwidth')
+        result_buffer << '<colgroup>'
+        col_style_attribute = (node.attr? 'labelwidth') ? %( style="width:#{(node.attr 'labelwidth').chomp '%'}%;") : nil
+        result_buffer << %(<col#{col_style_attribute}>)
+        col_style_attribute = (node.attr? 'itemwidth') ? %( style="width:#{(node.attr 'itemwidth').chomp '%'}%;") : nil
+        result_buffer << %(<col#{col_style_attribute}>)
+        result_buffer << '</colgroup>'
+      end
+      node.items.each do |terms, dd|
+        result_buffer << '<tr>'
+        result_buffer << %(<td class="hdlist1#{(node.option? 'strong') ? ' strong' : nil}">)
+        terms_array = [*terms]
+        last_term = terms_array.last
+        terms_array.each do |dt|
+          result_buffer << dt.text
+          result_buffer << '<br>' if dt != last_term
+        end
+        result_buffer << '</td>'
+        result_buffer << '<td class="hdlist2">'
+        unless dd.nil?
+          result_buffer << %(<p>#{dd.text}</p>) if dd.text?
+          result_buffer << dd.content if dd.blocks?
+        end
+        result_buffer << '</td>'
+        result_buffer << '</tr>'
+      end
+      result_buffer << '</table>'
+    else
+      result_buffer << '<dl>'
+      dt_style_attribute = node.style.nil? ? ' class="hdlist1"' : nil
+      node.items.each do |terms, dd|
+        [*terms].each do |dt|
+          result_buffer << %(<dt#{dt_style_attribute}>#{dt.text}</dt>)
+        end
+        unless dd.nil?
+          result_buffer << '<dd>'
+          result_buffer << %(<p>#{dd.text}</p>) if dd.text?
+          result_buffer << dd.content if dd.blocks?
+          result_buffer << '</dd>'
+        end
+      end
+      result_buffer << '</dl>'
+    end
+
+    result_buffer << '</div>'
+    result_buffer * EOL
+  end
+
   def template
-    @template ||= @eruby.new <<-EOS
-<%#encoding:UTF-8%><%
-continuing = false
-entries = content
-last_index = entries.length - 1
-if @style == 'qanda'
-%><div#{id} class="qlist#{style_class}#{role_class}"><%
-if title? %>
-<div class="title"><%= title %></div><%
-end %>
-<ol><%
-  entries.each_with_index do |(dt, dd), index|
-    last = (index == last_index)
-    unless continuing %>
-<li><%
-    end %>
-<p><em><%= dt.text %></em></p><%
-    if !last && dd.nil?
-      continuing = true
-      next
-    else
-      continuing = false
-    end
-    unless dd.nil?
-      if dd.text? %>
-<p><%= dd.text %></p><%
-      end
-      if dd.blocks? %>
-<%= dd.content %><%
-      end
-    end %>
-</li><%
-  end %>
-</ol>
-</div><%
-elsif @style == 'horizontal'
-%><div#{id} class="hdlist#{role_class}"><%
-if title? %>
-<div class="title"><%= title %></div><%
-end %>
-<table><%
-if (attr? :labelwidth) || (attr? :itemwidth) %>
-<colgroup>
-<col<% if attr? :labelwidth %> style="width:<%= (attr :labelwidth).chomp('%') %>%;"<% end %>>
-<col<% if attr? :itemwidth %> style="width:<%= (attr :itemwidth).chomp('%') %>%;"<% end %>>
-</colgroup><%
-end %><%
-  entries.each_with_index do |(dt, dd), index|
-    last = (index == last_index)
-    unless continuing %>
-<tr>
-<td class="hdlist1<%= (option? 'strong') ? 'strong' : nil %>"><%
-    end %>
-<%= dt.text %>
-<br><%
-    if !last && dd.nil?
-      continuing = true
-      next
-    else
-      continuing = false
-    end %>
-</td>
-<td class="hdlist2"><%
-    unless dd.nil?
-      if dd.text? %>
-<p><%= dd.text %></p><%
-      end
-      if dd.blocks? %>
-<%= dd.content %><%
-      end
-    end %>
-</td>
-</tr><%
-  end %>
-</table>
-</div><%
-else
-%><div#{id} class="dlist#{style_class}#{role_class}"><%
-if title? %>
-<div class="title"><%= title %></div><%
-end %>
-<dl><%
-  entries.each_with_index do |(dt, dd), index|
-    last = (index == last_index) %>
-<dt<%= @style.nil? ? %( class="hdlist1") : nil %>><%= dt.text %></dt><%
-    unless dd.nil? %>
-<dd><%
-      if dd.text? %>
-<p><%= dd.text %></p><%
-      end %><%
-      if dd.blocks? %>
-<%= dd.content %><%
-      end %>
-</dd><%
-    end
-  end %>
-</dl>
-</div><%
-end %>
-    EOS
+    :invoke_result
   end
 end
 
@@ -428,6 +431,9 @@ class BlockListingTemplate < BaseTemplate
       case node.attr 'source-highlighter'
       when 'coderay'
         pre_class = nowrap ? ' class="CodeRay nowrap"' : ' class="CodeRay"'
+        code_class = language ? %( class="#{language_classes}") : nil
+      when 'pygments'
+        pre_class = nowrap ? ' class="pygments highlight nowrap"' : ' class="pygments highlight"'
         code_class = language ? %( class="#{language_classes}") : nil
       when 'highlightjs', 'highlight.js'
         pre_class = nowrap ? ' class="highlight nowrap"' : ' class="highlight"'
@@ -450,10 +456,10 @@ class BlockListingTemplate < BaseTemplate
 
     %(<div#{node.id && " id=\"#{node.id}\""} class="listingblock#{node.role && " #{node.role}"}">#{node.title? ? "
 <div class=\"title\">#{node.captioned_title}</div>" : nil}
-<div class="content monospaced">
+<div class="content">
 #{pre}
 </div>
-</div>\n)
+</div>)
   end
 
   def template
@@ -466,10 +472,10 @@ class BlockLiteralTemplate < BaseTemplate
     nowrap = (!node.document.attr? 'prewrap') || (node.option? 'nowrap')
     %(<div#{node.id && " id=\"#{node.id}\""} class="literalblock#{node.role && " #{node.role}"}">#{node.title? ? "
 <div class=\"title\">#{node.title}</div>" : nil}
-<div class="content monospaced">
+<div class="content">
 <pre#{nowrap ? ' class="nowrap"' : nil}>#{preserve_endlines(node.content, node)}</pre>
 </div>
-</div>\n)
+</div>)
   end
 
   def template
@@ -504,7 +510,7 @@ class BlockAdmonitionTemplate < BaseTemplate
 </td>
 </tr>
 </table>
-</div>\n)
+</div>)
   end
 
   def template
@@ -513,15 +519,13 @@ class BlockAdmonitionTemplate < BaseTemplate
 end
 
 class BlockParagraphTemplate < BaseTemplate
-  def paragraph(id, role, title, content)
-    %(<div#{id && " id=\"#{id}\""} class="paragraph#{role && " #{role}"}">#{title && "
-<div class=\"title\">#{title}</div>"}
-<p>#{content}</p>
-</div>\n)
-  end
-
   def result(node)
-    paragraph(node.id, node.role, (node.title? ? node.title : nil), node.content)
+    id_attribute = node.id ? %( id="#{node.id}") : nil
+    title_element = node.title? ? %(<div class="title">#{node.title}</div>\n) : nil
+
+    %(<div#{id_attribute} class="#{!node.role? ? 'paragraph' : ['paragraph', node.role] * ' '}">
+#{title_element}<p>#{node.content}</p>
+</div>)
   end
 
   def template
@@ -530,28 +534,36 @@ class BlockParagraphTemplate < BaseTemplate
 end
 
 class BlockSidebarTemplate < BaseTemplate
+  def result(node)
+    id_attribute = node.id ? %( id="#{node.id}") : nil
+    title_element = node.title? ? %(<div class="title">#{node.title}</div>\n) : nil
+
+    %(<div#{id_attribute} class="#{!node.role? ? 'sidebarblock' : ['sidebarblock', node.role] * ' '}">
+<div class="content">
+#{title_element}#{node.content}
+</div>
+</div>)
+  end
+
   def template
-    @template ||= @eruby.new <<-EOS
-<%#encoding:UTF-8%><div#{id} class="sidebarblock#{role_class}">
-<div class="content"><%= title? ? %(
-<div class="title">\#{title}</div>) : nil %>
-<%= content %>
-</div>
-</div>
-    EOS
+    :invoke_result
   end
 end
 
 class BlockExampleTemplate < BaseTemplate
+  def result(node)
+    id_attribute = node.id ? %( id="#{node.id}") : nil
+    title_element = node.title? ? %(<div class="title">#{node.captioned_title}</div>\n) : nil
+
+    %(<div#{id_attribute} class="#{!node.role? ? 'exampleblock' : ['exampleblock', node.role] * ' '}">
+#{title_element}<div class="content">
+#{node.content}
+</div>
+</div>)
+  end
+
   def template
-    @template ||= @eruby.new <<-EOS
-<%#encoding:UTF-8%><div#{id} class="exampleblock#{role_class}"><%= title? ? %(
-<div class="title">\#{captioned_title}</div>) : nil %>
-<div class="content">
-<%= content %>
-</div>
-</div>
-    EOS
+    :invoke_result
   end
 end
 
@@ -562,8 +574,8 @@ class BlockOpenTemplate < BaseTemplate
 
   def open_block(node, id, style, role, title, content)
     if style == 'abstract'
-      if node.parent == node.document && node.document.attr?('doctype', 'book')
-        puts 'asciidoctor: WARNING: abstract block cannot be used in a document without a title when doctype is book. Excluding block content.'
+      if node.parent == node.document && node.document.doctype == 'book'
+        warn 'asciidoctor: WARNING: abstract block cannot be used in a document without a title when doctype is book. Excluding block content.'
         ''
       else
         %(<div#{id && " id=\"#{id}\""} class="quoteblock abstract#{role && " #{role}"}">#{title &&
@@ -571,10 +583,10 @@ class BlockOpenTemplate < BaseTemplate
 <blockquote>
 #{content}
 </blockquote>
-</div>\n)
+</div>)
       end
-    elsif style == 'partintro' && (!node.document.attr?('doctype', 'book') || !node.parent.is_a?(Asciidoctor::Section) || node.level != 0)
-      puts 'asciidoctor: ERROR: partintro block can only be used when doctype is book and it\'s a child of a book part. Excluding block content.'
+    elsif style == 'partintro' && (node.level != 0 || node.parent.context != :section || node.document.doctype != 'book')
+      warn 'asciidoctor: ERROR: partintro block can only be used when doctype is book and it\'s a child of a book part. Excluding block content.'
       ''
     else
       %(<div#{id && " id=\"#{id}\""} class="openblock#{style != 'open' ? " #{style}" : ''}#{role && " #{role}"}">#{title &&
@@ -582,7 +594,7 @@ class BlockOpenTemplate < BaseTemplate
 <div class="content">
 #{content}
 </div>
-</div>\n)
+</div>)
     end
   end
 
@@ -598,136 +610,196 @@ class BlockPassTemplate < BaseTemplate
 end
 
 class BlockQuoteTemplate < BaseTemplate
-  def template
-    @template ||= @eruby.new <<-EOS
-<%#encoding:UTF-8%><div#{id} class="quoteblock#{role_class}"><%= title? ? %(
-<div class="title">\#{title}</div>) : nil %>
+  def result(node)
+    id_attribute = node.id ? %( id="#{node.id}") : nil
+    classes = ['quoteblock', node.role].compact
+    class_attribute = %( class="#{classes * ' '}")
+    title_element = node.title? ? %(\n<div class="title">#{node.title}</div>) : nil
+    attribution = (node.attr? 'attribution') ? (node.attr 'attribution') : nil
+    citetitle = (node.attr? 'citetitle') ? (node.attr 'citetitle') : nil
+    if attribution || citetitle
+      cite_element = citetitle ? %(<cite>#{citetitle}</cite>) : nil
+      attribution_text = attribution ? %(#{citetitle ? "<br>\n" : nil}&#8212; #{attribution}) : nil
+      attribution_element = %(\n<div class="attribution">\n#{cite_element}#{attribution_text}\n</div>)
+    else
+      attribution_element = nil
+    end
+
+    %(<div#{id_attribute}#{class_attribute}>#{title_element}
 <blockquote>
-<%= content %>
-</blockquote><%
-if (attr? :attribution) || (attr? :citetitle) %>
-<div class="attribution"><%
-  if attr? :citetitle %>
-<cite><%= attr :citetitle %></cite><%
+#{node.content}
+</blockquote>#{attribution_element}
+</div>)
   end
-  if attr? :attribution
-    if attr? :citetitle %>
-<br><%
-    end %>
-<%= "&#8212; \#{attr :attribution}" %><%
-  end %>
-</div><%
-end %>
-</div>
-    EOS
+
+  def template
+    :invoke_result
   end
 end
 
 class BlockVerseTemplate < BaseTemplate
-  def template
-    @template ||= @eruby.new <<-EOS
-<%#encoding:UTF-8%><div#{id} class="verseblock#{role_class}"><%= title? ? %(
-<div class="title">\#{title}</div>) : nil %>
-<pre class="content"><%= template.preserve_endlines(content, self) %></pre><%
-if (attr? :attribution) || (attr? :citetitle) %>
-<div class="attribution"><%
-  if attr? :citetitle %>
-<cite><%= attr :citetitle %></cite><%
+  def result(node)
+    id_attribute = node.id ? %( id="#{node.id}") : nil
+    classes = ['verseblock', node.role].compact
+    class_attribute = %( class="#{classes * ' '}")
+    title_element = node.title? ? %(\n<div class="title">#{node.title}</div>) : nil
+    attribution = (node.attr? 'attribution') ? (node.attr 'attribution') : nil
+    citetitle = (node.attr? 'citetitle') ? (node.attr 'citetitle') : nil
+    if attribution || citetitle
+      cite_element = citetitle ? %(<cite>#{citetitle}</cite>) : nil
+      attribution_text = attribution ? %(#{citetitle ? "<br>\n" : nil}&#8212; #{attribution}) : nil
+      attribution_element = %(\n<div class="attribution">\n#{cite_element}#{attribution_text}\n</div>)
+    else
+      attribution_element = nil
+    end
+
+    %(<div#{id_attribute}#{class_attribute}>#{title_element}
+<pre class="content">#{preserve_endlines node.content, node}</pre>#{attribution_element}
+</div>)
   end
-  if attr? :attribution
-    if attr? :citetitle %>
-<br><%
-    end %>
-<%= "&#8212; \#{attr :attribution}" %><%
-  end %>
-  </div><%
-end %>
-</div>
-    EOS
+
+  def template
+    :invoke_result
   end
 end
 
 class BlockUlistTemplate < BaseTemplate
+  def result(node)
+    result_buffer = []
+    id_attribute = node.id ? %( id="#{node.id}") : nil
+    div_classes = ['ulist', node.style, node.role].compact
+    marker_checked = nil
+    marker_unchecked = nil
+    if (checklist = (node.option? 'checklist'))
+      div_classes.insert(1, 'checklist')
+      ul_class_attribute = ' class="checklist"'
+      if node.option? 'interactive'
+        marker_checked = %(<input type="checkbox" data-item-complete="1" checked> )
+        marker_unchecked = %(<input type="checkbox" data-item-complete="0"> )
+      else
+        if node.document.attr? 'icons', 'font'
+          marker_checked = '<i class="icon-check"></i> '
+          marker_unchecked = '<i class="icon-check-empty"></i> '
+        else
+          # could use &#9745 (checked ballot) and &#9744 (ballot) w/o font instead
+          marker_checked = %(<input type="checkbox" data-item-complete="1" checked disabled> )
+          marker_unchecked = %(<input type="checkbox" data-item-complete="0" disabled> )
+        end
+      end
+    elsif !node.style.nil?
+      ul_class_attribute = %( class="#{node.style}")
+    else
+      ul_class_attribute = nil
+    end
+    div_class_attribute = %( class="#{div_classes * ' '}")
+    result_buffer << %(<div#{id_attribute}#{div_class_attribute}>)
+    result_buffer << %(<div class="title">#{node.title}</div>) if node.title?
+    result_buffer << %(<ul#{ul_class_attribute}>)
+
+    node.items.each do |item|
+      if checklist && (item.attr? 'checkbox')
+        marker = (item.attr? 'checked') ? marker_checked : marker_unchecked
+      else
+        marker = nil
+      end
+      result_buffer << '<li>'
+      result_buffer << %(<p>#{marker}#{item.text}</p>)
+      result_buffer << item.content if item.blocks?
+      result_buffer << '</li>'
+    end
+
+    result_buffer << '</ul>'
+    result_buffer << '</div>'
+
+    result_buffer * EOL
+  end
+
   def template
-    @template ||= @eruby.new <<-EOS
-<%#encoding:UTF-8%><div#{id} class="ulist<%= (checklist = (option? 'checklist')) ? ' checklist' : nil %>#{style_class}#{role_class}"><%= title? ? %(
-<div class="title">\#{title}</div>) : nil %>
-<ul<%= checklist ? ' class="checklist"' : (!@style.nil? ? %( class="\#{@style}") : nil) %>><%
-if checklist
-  # could use &#9745 (checked ballot) and &#9744 (ballot) w/o font instead
-  marker_checked = (@document.attr? 'icons', 'font') ? '<i class="icon-check"></i> ' : '<input type="checkbox" data-item-complete="1" checked disabled> '
-  marker_unchecked = (@document.attr? 'icons', 'font') ? '<i class="icon-check-empty"></i> ' : '<input type="checkbox" data-item-complete="0" disabled> '
-end
-content.each do |item| %>
-<li>
-<p><% if checklist && (item.attr? 'checkbox') %><%= (item.attr? 'checked') ? marker_checked : marker_unchecked %><% end %><%= item.text %></p><%
-  if item.blocks? %>
-<%= item.content %><%
-  end %>
-</li><%
-end %>
-</ul>
-</div>
-    EOS
+    :invoke_result
   end
 end
 
 class BlockOlistTemplate < BaseTemplate
+  def result(node)
+    result_buffer = []
+    id_attribute = node.id ? %( id="#{node.id}") : nil
+    classes = ['olist', node.style, node.role].compact
+    class_attribute = %( class="#{classes * ' '}")
+
+    result_buffer << %(<div#{id_attribute}#{class_attribute}>)
+    result_buffer << %(<div class="title">#{node.title}</div>) if node.title?
+
+    type_attribute = (keyword = node.list_marker_keyword) ? %( type="#{keyword}") : nil
+    start_attribute = (node.attr? 'start') ? %( start="#{node.attr 'start'}") : nil
+    result_buffer << %(<ol class="#{node.style}"#{type_attribute}#{start_attribute}>)
+
+    node.items.each do |item|
+      result_buffer << '<li>'
+      result_buffer << %(<p>#{item.text}</p>)
+      result_buffer << item.content if item.blocks?
+      result_buffer << '</li>'
+    end
+
+    result_buffer << '</ol>'
+    result_buffer << '</div>'
+
+    result_buffer * EOL
+  end
 
   def template
-    @template ||= @eruby.new <<-EOS
-<%#encoding:UTF-8%><div#{id} class="olist#{style_class}#{role_class}"><%= title? ? %(
-<div class="title">\#{title}</div>) : nil %>
-<ol class="<%= @style %>"<%= (keyword = list_marker_keyword) ? %( type="\#{keyword}") : nil %>#{attribute('start', :start)}><%
-content.each do |item| %>
-<li>
-<p><%= item.text %></p><%
-  if item.blocks? %>
-<%= item.content %><%
-  end %>
-</li><%
-end %>
-</ol>
-</div>
-    EOS
+    :invoke_result
   end
 end
 
 class BlockColistTemplate < BaseTemplate
+  def result(node)
+    result_buffer = []
+    id_attribute = node.id ? %( id="#{node.id}") : nil
+    classes = ['colist', node.style, node.role].compact
+    class_attribute = %( class="#{classes * ' '}")
+
+    result_buffer << %(<div#{id_attribute}#{class_attribute}>)
+    result_buffer << %(<div class="title">#{node.title}</div>) if node.title?
+
+    if node.document.attr? 'icons'
+      result_buffer << '<table>'
+
+      font_icons = node.document.attr? 'icons', 'font'
+      node.items.each_with_index do |item, i|
+        num = i + 1
+        num_element = font_icons ?
+            %(<i class="conum" data-value="#{num}"></i><b>#{num}</b>) :
+            %(<img src="#{node.icon_uri "callouts/#{num}"}" alt="#{num}">)
+        result_buffer << %(<tr>
+<td>#{num_element}</td>
+<td>#{item.text}</td>
+</tr>)
+      end
+
+      result_buffer << '</table>'
+    else
+      result_buffer << '<ol>'
+      node.items.each do |item|
+        result_buffer << %(<li>
+<p>#{item.text}</p>
+</li>)
+      end
+      result_buffer << '</ol>'
+    end
+
+    result_buffer << '</div>'
+    result_buffer * EOL
+  end
+
   def template
-    @template ||= @eruby.new <<-EOS
-<%#encoding:UTF-8%><div#{id} class="colist#{style_class}#{role_class}"><%= title? ? %(
-<div class="title">\#{title}</div>) : nil %><%
-if @document.attr? 'icons' %>
-<table><%
-  content.each_with_index do |item, i| %>
-<tr>
-<td><%
-    if @document.attr? 'icons', 'font' %><%= %(<i class="conum" data-value="\#{i + 1}"></i><b>\#{i + 1}</b>) %><%
-    else %><img src="<%= icon_uri("callouts/\#{i + 1}") %>" alt="<%= i + 1 %>"><%
-    end %></td>
-<td><%= item.text %></td>
-</tr><%
-  end %>
-</table><%
-else %>
-<ol><%
-  content.each do |item| %>
-<li>
-<p><%= item.text %></p>
-</li><%
-  end %>
-</ol><%
-end %>
-</div>
-    EOS
+    :invoke_result
   end
 end
 
 class BlockTableTemplate < BaseTemplate
   def template
     @template ||= @eruby.new <<-EOS
-<%#encoding:UTF-8%><table#{id} class="tableblock frame-<%= attr :frame, 'all' %> grid-<%= attr :grid, 'all'%>#{role_class}" style="<%
+<%#encoding:UTF-8%><table<%= @id ? %( id="\#{@id}") : nil %> class="tableblock frame-<%= attr :frame, 'all' %> grid-<%= attr :grid, 'all'%><%= role? ? " \#{role}" : nil %>" style="<%
 if !(option? 'autowidth') %>width:<%= attr :tablepcwidth %>%; <% end %><%
 if attr? :float %>float: <%= attr :float %>; <% end %>"><%
 if title? %>
@@ -761,7 +833,7 @@ if (attr :rowcount) >= 0 %>
           when :verse
             cell_content = %(<div class="verse">\#{template.preserve_endlines(cell.text, self)}</div>)
           when :literal
-            cell_content = %(<div class="literal monospaced"><pre>\#{template.preserve_endlines(cell.text, self)}</pre></div>)
+            cell_content = %(<div class="literal"><pre>\#{template.preserve_endlines(cell.text, self)}</pre></div>)
           when :header
             cell.content.each do |text|
               cell_content = %(\#{cell_content}<p class="tableblock header">\#{text}</p>)
@@ -785,59 +857,109 @@ end %>
 end
 
 class BlockImageTemplate < BaseTemplate
+  def image(target, alt, title, link, node)
+    align = (node.attr? 'align') ? (node.attr 'align') : nil
+    float = (node.attr? 'float') ? (node.attr 'float') : nil 
+    if align || float
+      styles = [align ? %(text-align: #{align}) : nil, float ? %(float: #{float}) : nil].compact
+      style_attribute = %( style="#{styles * ';'}")
+    else
+      style_attribute = nil
+    end
+
+    width_attribute = (node.attr? 'width') ? %( width="#{node.attr 'width'}") : nil
+    height_attribute = (node.attr? 'height') ? %( height="#{node.attr 'height'}") : nil
+
+    img_element = %(<img src="#{node.image_uri target}" alt="#{alt}"#{width_attribute}#{height_attribute}>)
+    if link
+      img_element = %(<a class="image" href="#{link}">#{img_element}</a>)
+    end
+    id_attribute = node.id ? %( id="#{node.id}") : nil
+    classes = ['imageblock', node.style, node.role].compact
+    class_attribute = %( class="#{classes * ' '}")
+    title_element = title ? %(\n<div class="title">#{title}</div>) : nil
+
+    %(<div#{id_attribute}#{class_attribute}#{style_attribute}>
+<div class="content">
+#{img_element}
+</div>#{title_element}
+</div>)
+  end
+
+  def result(node)
+    image(node.attr('target'), node.attr('alt'), node.title? ? node.captioned_title : nil, node.attr('link'), node)
+  end
+
   def template
-    @template ||= @eruby.new <<-EOS
-<%#encoding:UTF-8%><div#{id} class="imageblock#{style_class}#{role_class}"<%
-if (attr? :align) || (attr? :float) %> style="<%
-  if attr? :align %>text-align: <%= attr :align %><% if attr? :float %>; <% end %><% end %><% if attr? :float %>float: <%= attr :float %><% end %>"<%
-end %>>
-<div class="content"><%
-if attr? :link %>
-<a class="image" href="<%= attr :link %>"><img src="<%= image_uri(attr :target) %>" alt="<%= attr :alt %>"#{attribute('width', :width)}#{attribute('height', :height)}></a><%
-else %>
-<img src="<%= image_uri(attr :target) %>" alt="<%= attr :alt %>"#{attribute('width', :width)}#{attribute('height', :height)}><%
-end %>
-</div><%= title? ? %(
-<div class="title">\#{captioned_title}</div>) : nil %>
-</div>
-    EOS
+    :invoke_result
   end
 end
 
 class BlockAudioTemplate < BaseTemplate
-  def template
-    @template ||= @eruby.new <<-EOS
-<%#encoding:UTF-8%><div#{id} class="audioblock#{style_class}#{role_class}"><%= title? ? %(
-<div class="title">\#{captioned_title}</div>) : nil %>
+  def result(node)
+    id_attribute = node.id ? %( id="#{node.id}") : nil
+    classes = ['audioblock', node.style, node.role].compact
+    class_attribute = %( class="#{classes * ' '}")
+    title_element = node.title? ? %(\n<div class="title">#{node.captioned_title}</div>) : nil
+    %(<div#{id_attribute}#{class_attribute}>#{title_element}
 <div class="content">
-<audio src="<%= media_uri(attr :target) %>"<%
-if option? 'autoplay' %> autoplay<% end %><%
-unless option? 'nocontrols' %> controls<% end %><%
-if option? 'loop' %> loop<% end %>>
+<audio src="#{node.media_uri(node.attr 'target')}"#{(node.option? 'autoplay') ? ' autoplay' : nil}#{(node.option? 'nocontrols') ? nil : ' controls'}#{(node.option? 'loop') ? ' loop' : nil}>
 Your browser does not support the audio tag.
 </audio>
 </div>
-</div>
-    EOS
+</div>)
+  end
+
+  def template
+    :invoke_result
   end
 end
 
 class BlockVideoTemplate < BaseTemplate
-  def template
-    @template ||= @eruby.new <<-EOS
-<%#encoding:UTF-8%><div#{id} class="videoblock#{style_class}#{role_class}"><%= title? ? %(
-<div class="title">\#{captioned_title}</div>) : nil %>
+  def result(node)
+    id_attribute = node.id ? %( id="#{node.id}") : nil
+    classes = ['videoblock', node.style, node.role].compact
+    class_attribute = %( class="#{classes * ' '}")
+    title_element = node.title? ? %(\n<div class="title">#{node.captioned_title}</div>) : nil
+    width_attribute = (node.attr? 'width') ? %( width="#{node.attr 'width'}") : nil
+    height_attribute = (node.attr? 'height') ? %( height="#{node.attr 'height'}") : nil
+    case node.attr 'poster'
+    when 'vimeo'
+      start_anchor = (node.attr? 'start') ? "#at=#{node.attr 'start'}" : nil
+      delimiter = '?'
+      autoplay_param = (node.option? 'autoplay') ? "#{delimiter}autoplay=1" : nil
+      delimiter = '&amp;' if autoplay_param
+      loop_param = (node.option? 'loop') ? "#{delimiter}loop=1" : nil
+      %(<div#{id_attribute}#{class_attribute}>#{title_element}
 <div class="content">
-<video src="<%= media_uri(attr :target) %>"#{attribute('width', :width)}#{attribute('height', :height)}<%
-if attr? 'poster' %> poster="<%= media_uri(attr :poster) %>"<% end %><%
-if option? 'autoplay' %> autoplay<% end %><%
-unless option? 'nocontrols' %> controls<% end %><%
-if option? 'loop' %> loop<% end %>>
+<iframe#{width_attribute}#{height_attribute} src="//player.vimeo.com/video/#{node.attr 'target'}#{start_anchor}#{autoplay_param}#{loop_param}" frameborder="0" webkitAllowFullScreen mozallowfullscreen allowFullScreen></iframe>
+</div>
+</div>)
+    when 'youtube'
+      start_param = (node.attr? 'start') ? "&amp;start=#{node.attr 'start'}" : nil
+      end_param = (node.attr? 'end') ? "&amp;end=#{node.attr 'end'}" : nil
+      autoplay_param = (node.option? 'autoplay') ? '&amp;autoplay=1' : nil
+      loop_param = (node.option? 'loop') ? '&amp;loop=1' : nil
+      controls_param = (node.option? 'nocontrols') ? '&amp;controls=0' : nil
+      %(<div#{id_attribute}#{class_attribute}>#{title_element}
+<div class="content">
+<iframe#{width_attribute}#{height_attribute} src="//www.youtube.com/embed/#{node.attr 'target'}?rel=0#{start_param}#{end_param}#{autoplay_param}#{loop_param}#{controls_param}" frameborder="0"#{(node.option? 'nofullscreen') ? nil : ' allowfullscreen'}></iframe>
+</div>
+</div>)
+    else 
+      poster_attribute = (node.attr? 'poster') ? %( poster="#{node.media_uri(node.attr 'poster')}") : nil
+      %(<div#{id_attribute}#{class_attribute}>#{title_element}
+<div class="content">
+<video src="#{node.media_uri(node.attr 'target')}"#{width_attribute}#{height_attribute}#{poster_attribute}#{(node.option? 'autoplay') ? ' autoplay' : nil}#{(node.option? 'nocontrols') ? nil : ' controls'}#{(node.option? 'loop') ? ' loop' : nil}>
 Your browser does not support the video tag.
 </video>
 </div>
-</div>
-    EOS
+</div>)
+    end
+  end
+
+  def template
+    :invoke_result
   end
 end
 
@@ -853,7 +975,7 @@ end
 
 class BlockPageBreakTemplate < BaseTemplate
   def result(node)
-    %(<div style="page-break-after: always;"></div>\n)
+    %(<div style="page-break-after: always;"></div>)
   end
 
   def template
@@ -901,23 +1023,26 @@ class InlineQuotedTemplate < BaseTemplate
     :single => ['&#8216;', '&#8217;', false]
   }
 
-  def quote_text(text, type, role)
+  def quote_text(text, type, id, role)
     open, close, is_tag = QUOTE_TAGS[type] || NO_TAGS
+    anchor = id.nil? ? nil : %(<a id="#{id}"></a>)
     if role
       if is_tag
-        %(#{open.chop} class="#{role}">#{text}#{close})
+        quoted_text = %(#{open.chop} class="#{role}">#{text}#{close})
       else
-        %(<span class="#{role}">#{open}#{text}#{close}</span>)
+        quoted_text = %(<span class="#{role}">#{open}#{text}#{close}</span>)
       end
     elsif open.nil?
-      text
+      quoted_text = text
     else
-      %(#{open}#{text}#{close})
+      quoted_text = %(#{open}#{text}#{close})
     end
+
+    anchor.nil? ? quoted_text : %(#{anchor}#{quoted_text})
   end
 
   def result(node)
-    quote_text(node.text, node.type, node.role)
+    quote_text(node.text, node.type, node.id, node.role)
   end
 
   def template
@@ -976,8 +1101,12 @@ class InlineAnchorTemplate < BaseTemplate
   def anchor(target, text, type, document, node)
     case type
     when :xref
-      text = document.references[:ids].fetch(target, "[#{target}]") if text.nil?
-      %(<a href="##{target}">#{text}</a>)
+      refid = (node.attr 'refid') || target
+      if text.nil?
+        # FIXME this seems like it should be prepared already
+        text = document.references[:ids].fetch(refid, "[#{refid}]") if text.nil?
+      end
+      %(<a href="#{target}">#{text}</a>)
     when :ref
       %(<a id="#{target}"></a>)
     when :link
@@ -997,28 +1126,77 @@ class InlineAnchorTemplate < BaseTemplate
 end
 
 class InlineImageTemplate < BaseTemplate
+  def image(target, type, node)
+    if type == 'icon' && (node.document.attr? 'icons', 'font') 
+      style_class = "icon-#{target}"
+      if node.attr? 'size'
+        style_class = "#{style_class} icon-#{node.attr 'size'}"
+      end
+      if node.attr? 'rotate'
+        style_class = "#{style_class} icon-rotate-#{node.attr 'rotate'}"
+      end
+      if node.attr? 'flip'
+        style_class = "#{style_class} icon-flip-#{node.attr 'flip'}"
+      end
+      title_attribute = (node.attr? 'title') ? %( title="#{node.attr 'title'}") : nil
+      img = %(<i class="#{style_class}"#{title_attribute}></i>)
+    elsif type == 'icon' && !(node.document.attr? 'icons')
+      img = "[#{node.attr 'alt'}]"
+    else
+      if type == 'icon'
+        resolved_target = node.icon_uri target
+      else
+        resolved_target = node.image_uri target
+      end
+
+      attrs = ['alt', 'width', 'height', 'title'].map {|name|
+        if node.attr? name
+          %( #{name}="#{node.attr name}")
+        else
+          nil
+        end
+      }.join
+
+      img = %(<img src="#{resolved_target}"#{attrs}>)
+    end
+
+    if node.attr? 'link'
+      img = %(<a class="image" href="#{node.attr 'link'}"#{(node.attr? 'window') ? " target=\"#{node.attr 'window'}\"" : nil}>#{img}</a>)
+    end
+
+    if node.role?
+      style_classes = %(#{type} #{node.role})
+    else
+      style_classes = type
+    end
+
+    style_attr = (node.attr? 'float') ? %( style="float: #{node.attr 'float'}") : nil
+
+    %(<span class="#{style_classes}"#{style_attr}>#{img}</span>)
+  end
+
+  def result(node)
+    image(node.target, node.type, node)
+  end
+
   def template
-    # care is taken here to avoid a space inside the optional <a> tag
-    @template ||= @eruby.new <<-EOS
-<%#encoding:UTF-8%><span class="image#{role_class}"><%
-if attr? :link %><a class="image" href="<%= attr :link %>"><%
-end %><img src="<%= image_uri(@target) %>" alt="<%= attr :alt %>"#{attribute('width', :width)}#{attribute('height', :height)}#{attribute('title', :title)}><%
-if attr? :link%></a><% end
-%></span>
-    EOS
+    :invoke_result
   end
 end
 
 class InlineFootnoteTemplate < BaseTemplate
+  def result(node)
+    index = node.attr :index
+    if node.type == :xref
+      %(<span class="footnoteref">[<a class="footnote" href="#_footnote_#{index}" title="View footnote.">#{index}</a>]</span>)
+    else
+      id_attribute = node.id ? %( id="_footnote_#{node.id}") : nil
+      %(<span class="footnote"#{id_attribute}>[<a id="_footnoteref_#{index}" class="footnote" href="#_footnote_#{index}" title="View footnote.">#{index}</a>]</span>)
+    end
+  end
+
   def template
-    @template ||= @eruby.new <<-EOS
-<%#encoding:UTF-8%><%
-if @type == :xref
-%><span class="footnoteref">[<a class="footnote" href="#_footnote_<%= attr :index %>" title="View footnote."><%= attr :index %></a>]</span><%
-else
-%><span class="footnote"<% if @id %> id="_footnote_<%= @id %>"<% end %>>[<a id="_footnoteref_<%= attr :index %>" class="footnote" href="#_footnote_<%= attr :index %>" title="View footnote."><%= attr :index %></a>]</span><%
-end %>
-    EOS
+    :invoke_result
   end
 end
 
