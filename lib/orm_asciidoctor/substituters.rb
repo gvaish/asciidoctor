@@ -281,24 +281,24 @@ module Substituters
       # ORM: if passthroughs are not literal or latexmath, run through docbook2htmlbook conversion first
 
        #if (pass[:literal] || pass[:latexmath]) != true
-       if pass[:literal] != true
+       #if pass[:literal] != true
 
-        passthrough_text = pass[:text]
+        #passthrough_text = pass[:text]
 
           # set up xslt
-          stylesheet_file = LibXML::XML::Document.file('../docbook2htmlbook/db2htmlbook.xsl')
-          xslt = LibXSLT::XSLT::Stylesheet.new(stylesheet_file)
+          #stylesheet_file = LibXML::XML::Document.file('../docbook2htmlbook/db2htmlbook.xsl')
+          #xslt = LibXSLT::XSLT::Stylesheet.new(stylesheet_file)
 
           # set up xml
-          parser = LibXML::XML::Parser.string(passthrough_text, :encoding => XML::Encoding::UTF_8)
-          xml = parser.parse
+          #parser = LibXML::XML::Parser.string(passthrough_text, :encoding => XML::Encoding::UTF_8)
+          #xml = parser.parse
 
           # apply xslt to xml
-          result = xslt.apply(xml)
+          #result = xslt.apply(xml)
 
           # strip off the encoding line
-          result.to_s.gsub(/<\?xml version="1.0" encoding="UTF-8"\?>/, '')
-      end
+          #result.to_s.gsub(/<\?xml version="1.0" encoding="UTF-8"\?>/, '')
+      #end
     }
 
   end
