@@ -1031,29 +1031,29 @@ module Asciidoctor
   end
 
   # modules
-  require 'asciidoctor/debug'
-  require 'asciidoctor/substituters'
-  require 'asciidoctor/helpers'
+  require 'orm_asciidoctor/debug'
+  require 'orm_asciidoctor/substituters'
+  require 'orm_asciidoctor/helpers'
 
   # abstract classes
-  require 'asciidoctor/abstract_node'
-  require 'asciidoctor/abstract_block'
+  require 'orm_asciidoctor/abstract_node'
+  require 'orm_asciidoctor/abstract_block'
 
   # concrete classes
-  require 'asciidoctor/attribute_list'
-  require 'asciidoctor/backends/base_template'
-  require 'asciidoctor/block'
-  require 'asciidoctor/callouts'
-  require 'asciidoctor/document'
-  require 'asciidoctor/inline'
-  require 'asciidoctor/lexer'
-  require 'asciidoctor/list'
-  require 'asciidoctor/path_resolver'
-  require 'asciidoctor/reader'
-  require 'asciidoctor/renderer'
-  require 'asciidoctor/section'
-  require 'asciidoctor/table'
+  require 'orm_asciidoctor/attribute_list'
+  require 'orm_asciidoctor/backends/base_template'
+  require 'orm_asciidoctor/block'
+  require 'orm_asciidoctor/callouts'
+  require 'orm_asciidoctor/document'
+  require 'orm_asciidoctor/inline'
+  require 'orm_asciidoctor/lexer'
+  require 'orm_asciidoctor/list'
+  require 'orm_asciidoctor/path_resolver'
+  require 'orm_asciidoctor/reader'
+  require 'orm_asciidoctor/renderer'
+  require 'orm_asciidoctor/section'
+  require 'orm_asciidoctor/table'
 
   # info
-  require 'asciidoctor/version'
+  require 'orm_asciidoctor/version'
 end
