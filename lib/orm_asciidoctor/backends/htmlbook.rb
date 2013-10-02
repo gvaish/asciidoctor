@@ -1085,18 +1085,15 @@ class InlineAnchorTemplate < BaseTemplate
   def anchor(target, text, type, document, node)
     case type
     when :xref
-      refid = (node.attr 'refid') || target
-      if text.nil?
-        # FIXME this seems like it should be prepared already
-        text = document.references[:ids].fetch(refid, "[#{refid}]") if text.nil?
-      end
-      %(<a href="#{target}">#{text}</a>)
+      %(<a data-type="xref" href="#{target}">#{text || document.references[:ids].fetch(target, "[#{target}]").tr_s("\n", ' ')}</a>)
     when :ref
       %(<a id="#{target}"></a>)
-    when :link
-      %(<a href="#{target}"#{node.role? ? " class=\"#{node.role}\"" : nil}#{(node.attr? 'window') ? " target=\"#{node.attr 'window'}\"" : nil}>#{text}</a>)
     when :bibref
-      %(<a id="#{target}"></a>[#{target}])
+      %(<a id="#{target}">[#{target}]</a>)
+    else 
+      role = stratt(node, 'role', :role)
+      window = stratt(node, 'window', :window)
+      %(<a href="#{target}"#{role}#{window}>#{node.text}</a>)
     end
   end
 
@@ -1172,10 +1169,10 @@ class InlineFootnoteTemplate < BaseTemplate
   def result(node)
     index = node.attr :index
     if node.type == :xref
-      %(<span class="footnoteref">[<a class="footnote" href="#_footnote_#{index}" title="View footnote.">#{index}</a>]</span>)
+      %(<a data-type="footnoteref" href="##{node.target}"/>)
     else
-      id_attribute = node.id ? %( id="_footnote_#{node.id}") : nil
-      %(<span class="footnote"#{id_attribute}>[<a id="_footnoteref_#{index}" class="footnote" href="#_footnote_#{index}" title="View footnote.">#{index}</a>]</span>)
+      idatt = node.id ? %( id="#{node.id}") : nil
+      %(<span data-type="footnote"#{idatt}>#{node.text}%></span>)
     end
   end
 
