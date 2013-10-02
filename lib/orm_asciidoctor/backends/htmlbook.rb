@@ -491,31 +491,11 @@ end
 
 class BlockAdmonitionTemplate < BaseTemplate
   def result(node)
-    id = node.id
-    name = node.attr 'name'
-    role = node.role
-    title = node.title? ? node.title : nil
-    if node.document.attr? 'icons'
-      if node.document.attr? 'icons', 'font'
-        caption = %(<i class="icon-#{name}" title="#{node.caption}"></i>)
-      else
-        caption = %(<img src="#{node.icon_uri(name)}" alt="#{node.caption}">)
-      end
-    else
-      caption = %(<div class="title">#{node.caption}</div>)
-    end
-    %(<div#{id && " id=\"#{id}\""} class="admonitionblock #{name}#{role && " #{role}"}">
-<table>
-<tr>
-<td class="icon">
-#{caption}
-</td>
-<td class="content">#{title ? "
-<div class=\"title\">#{title}</div>" : nil}
-#{node.content}
-</td>
-</tr>
-</table>
+    role = stratt(node, 'class', :role)
+    title = node.title? ? %(<h1>#{node.title}</h1>) : nil
+    %(<div data-type="#{node.attr('name')}"#{role}>
+  #{title}
+  #{node.content.chomp}
 </div>)
   end
 
