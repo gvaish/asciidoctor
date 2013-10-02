@@ -39,139 +39,35 @@ class DocumentTemplate < BaseTemplate
   def template
     @template ||= @eruby.new <<-EOS
 <%#encoding:UTF-8%><!DOCTYPE html>
-<html<%= !(attr? 'nolang') ? %( lang="\#{attr 'lang', 'en'}") : nil %>>
-<head>
-<meta http-equiv="Content-Type" content="text/html; charset=<%= attr :encoding %>">
-<meta name="generator" content="Asciidoctor <%= attr 'asciidoctor-version' %>">
-<meta name="viewport" content="width=device-width, initial-scale=1.0"><%
-if attr? :description %>
-<meta name="description" content="<%= attr :description %>"><%
-end
-if attr? :keywords %>
-<meta name="keywords" content="<%= attr :keywords %>"><%
-end %>
-<title><%= doctitle(:sanitize => true) || (attr 'untitled-label') %></title><%
-if DEFAULT_STYLESHEET_KEYS.include?(attr 'stylesheet')
-  if @safe >= SafeMode::SECURE || (attr? 'linkcss') %>
-<link rel="stylesheet" href="<%= normalize_web_path(DEFAULT_STYLESHEET_NAME, (attr :stylesdir, '')) %>"><%
-  else %>
-<style>
-<%= ::Asciidoctor::HTMLBook.default_asciidoctor_stylesheet %>
-</style><%
-  end
-elsif attr? :stylesheet
-  if @safe >= SafeMode::SECURE || (attr? 'linkcss') %>
-<link rel="stylesheet" href="<%= normalize_web_path((attr :stylesheet), (attr :stylesdir, '')) %>"><%
-  else %>
-<style>
-<%= read_asset normalize_system_path((attr :stylesheet), (attr :stylesdir, '')), true %>
-</style><%
-  end
-end
-if attr? 'icons', 'font'
-  if !(attr 'iconfont-remote', '').nil? %>
-<link rel="stylesheet" href="<%= attr 'iconfont-cdn', 'http://cdnjs.cloudflare.com/ajax/libs/font-awesome/3.2.1/css' %>/<%= attr 'iconfont-name', 'font-awesome' %>.min.css"><%
-  else %>
-<link rel="stylesheet" href="<%= normalize_web_path(%(\#{attr 'iconfont-name', 'font-awesome'}.css), (attr 'stylesdir', '')) %>"><%
-  end
-end
-case attr 'source-highlighter'
-when 'coderay'
-  if (attr 'coderay-css', 'class') == 'class'
-    if @safe >= SafeMode::SECURE || (attr? 'linkcss') %>
-<link rel="stylesheet" href="<%= normalize_web_path('asciidoctor-coderay.css', (attr :stylesdir, '')) %>"><%
-    else %>
-<style>
-<%= ::Asciidoctor::HTMLBook.default_coderay_stylesheet %>
-</style><%
-    end
-  end
-when 'highlightjs', 'highlight.js' %>
-<link rel="stylesheet" href="<%= attr :highlightjsdir, 'http://cdnjs.cloudflare.com/ajax/libs/highlight.js/7.3' %>/styles/<%= attr 'highlightjs-theme', 'default' %>.min.css">
-<script src="<%= attr :highlightjsdir, 'http://cdnjs.cloudflare.com/ajax/libs/highlight.js/7.3' %>/highlight.min.js"></script>
-<script>hljs.initHighlightingOnLoad()</script><%
-when 'prettify' %>
-<link rel="stylesheet" href="<%= attr 'prettifydir', 'http://cdnjs.cloudflare.com/ajax/libs/prettify/r298' %>/<%= attr 'prettify-theme', 'prettify' %>.min.css">
-<script src="<%= attr 'prettifydir', 'http://cdnjs.cloudflare.com/ajax/libs/prettify/r298' %>/prettify.min.js"></script>
-<script>document.addEventListener('DOMContentLoaded', prettyPrint)</script><%
-end %><%= (docinfo_content = docinfo).empty? ? nil : %(
-\#{docinfo_content}) %>
-</head>
-<body#{id} class="<%= doctype %><%= (attr? 'toc-class') && (attr? 'toc') && (attr? 'toc-placement', 'auto') ? %( \#{attr 'toc-class'} toc-\#{attr 'toc-position'}) : nil %>"<%= (attr? 'max-width') ? %( style="max-width: \#{attr 'max-width'};") : nil %>><%
-unless noheader %>
-<div id="header"><%
-  if doctype == 'manpage' %>
-<h1><%= doctitle %> Manual Page</h1><%
-    if (attr? :toc) && (attr? 'toc-placement', 'auto') %>
-<div id="toc" class="<%= attr 'toc-class', 'toc' %>">
-<div id="toctitle"><%= attr 'toc-title' %></div>
-<%= template.class.outline(self, (attr :toclevels, 2).to_i) %>
-</div><%
-    end %>
-<h2><%= attr 'manname-title' %></h2>
-<div class="sectionbody">
-<p><%= %(\#{attr 'manname'} - \#{attr 'manpurpose'}) %></p>
-</div><%
-  else
-    if has_header?
-      unless notitle %>
-<h1><%= @header.title %></h1><%
-      end %><%
-      if attr? :author %>
-<span id="author" class="author"><%= attr :author %></span><br><%
-        if attr? :email %>
-<span id="email" class="email"><%= sub_macros(attr :email) %></span><br><%
-        end
-        if (authorcount = (attr :authorcount).to_i) > 1
-          (2..authorcount).each do |idx| %><span id="author<%= idx %>" class="author"><%= attr "author_\#{idx}" %></span><br><%
-            if attr? "email_\#{idx}" %>
-<span id="email<%= idx %>" class="email"><%= sub_macros(attr "email_\#{idx}") %></span><br><%
-            end
-          end
-        end
-      end
-      if attr? :revnumber %>
-<span id="revnumber"><%= ((attr 'version-label') || '').downcase %> <%= attr :revnumber %><%= (attr? :revdate) ? ',' : '' %></span><%
-      end
-      if attr? :revdate %>
-<span id="revdate"><%= attr :revdate %></span><%
-      end
-      if attr? :revremark %>
-<br><span id="revremark"><%= attr :revremark %></span><%
-      end
-    end
-    if (attr? :toc) && (attr? 'toc-placement', 'auto') %>
-<div id="toc" class="<%= attr 'toc-class', 'toc' %>">
-<div id="toctitle"><%= attr 'toc-title' %></div>
-<%= template.class.outline(self, (attr :toclevels, 2).to_i) %>
-</div><%
-    end
-  end %>
-</div><%
-end %>
-<div id="content">
+
+<html xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+xsi:schemaLocation="http://www.w3.org/1999/xhtml ../schema/htmlbook.xsd"
+xmlns="http://www.w3.org/1999/xhtml">
+
+  <head>
+    <title><%= doctitle %></title>
+    <meta name="<%= doctitle %>" content="text/html; charset=utf-8"/>
+  </head>
+<body<%= @id && %( id="#{@id}") %> data-type="book">
+  <h1><%= @header.title %></h1>
+  <figure data-type="cover">
+    <img src="cover.png"/>
+  </figure>
+  <section data-type="titlepage">
+    <h1><%= @header.title %></h1>
+    <% if attr? :author %><h2 data-type="author"><%= attr :author %></h2><% end %>
+  </section>
+  <section data-type="copyright-page">
+    <h1><%= @header.title %></h1>
+    <% if attr? :author %><p data-type="author">by <%= attr :author %></p><% end %>
+  </section>
+<% if @level == 1 && @role == 'dedication' %>
+<section data-type="dedication"<%= @id && %( id="#{@id}") %>>
+<%= %(<h#{@level}) %>><%= title %><%= %(</h#{@level}>) %>
+
 <%= content %>
-</div><%
-unless !footnotes? || (attr? :nofootnotes) %>
-<div id="footnotes">
-<hr><%
-  footnotes.each do |fn| %>
-<div class="footnote" id="_footnote_<%= fn.index %>">
-<a href="#_footnoteref_<%= fn.index %>"><%= fn.index %></a>. <%= fn.text %>
-</div><%
-  end %>
-</div><%
-end %>
-<div id="footer">
-<div id="footer-text"><%
-if attr? :revnumber %>
-<%= %(\#{attr 'version-label'} \#{attr :revnumber}) %><%
-end
-if attr? 'last-update-label' %>
-<%= %(\#{attr 'last-update-label'} \#{attr :docdatetime}) %><%
-end %>
-</div>
-</div>
+</section><% end %>
+<%= content %>
 </body>
 </html>
     EOS
