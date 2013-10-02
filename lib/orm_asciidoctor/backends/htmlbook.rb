@@ -616,53 +616,15 @@ end
 
 class BlockUlistTemplate < BaseTemplate
   def result(node)
-    result_buffer = []
-    id_attribute = node.id ? %( id="#{node.id}") : nil
-    div_classes = ['ulist', node.style, node.role].compact
-    marker_checked = nil
-    marker_unchecked = nil
-    if (checklist = (node.option? 'checklist'))
-      div_classes.insert(1, 'checklist')
-      ul_class_attribute = ' class="checklist"'
-      if node.option? 'interactive'
-        marker_checked = %(<input type="checkbox" data-item-complete="1" checked> )
-        marker_unchecked = %(<input type="checkbox" data-item-complete="0"> )
-      else
-        if node.document.attr? 'icons', 'font'
-          marker_checked = '<i class="icon-check"></i> '
-          marker_unchecked = '<i class="icon-check-empty"></i> '
-        else
-          # could use &#9745 (checked ballot) and &#9744 (ballot) w/o font instead
-          marker_checked = %(<input type="checkbox" data-item-complete="1" checked disabled> )
-          marker_unchecked = %(<input type="checkbox" data-item-complete="0" disabled> )
-        end
-      end
-    elsif !node.style.nil?
-      ul_class_attribute = %( class="#{node.style}")
-    else
-      ul_class_attribute = nil
-    end
-    div_class_attribute = %( class="#{div_classes * ' '}")
-    result_buffer << %(<div#{id_attribute}#{div_class_attribute}>)
-    result_buffer << %(<div class="title">#{node.title}</div>) if node.title?
-    result_buffer << %(<ul#{ul_class_attribute}>)
-
-    node.items.each do |item|
-      if checklist && (item.attr? 'checkbox')
-        marker = (item.attr? 'checked') ? marker_checked : marker_unchecked
-      else
-        marker = nil
-      end
-      result_buffer << '<li>'
-      result_buffer << %(<p>#{marker}#{item.text}</p>)
-      result_buffer << item.content if item.blocks?
-      result_buffer << '</li>'
-    end
-
-    result_buffer << '</ul>'
-    result_buffer << '</div>'
-
-    result_buffer * EOL
+    idatt = node.id ? %( id="#{node.id}") : nil
+    role = stratt(node, 'class', :role)
+    list = %(<ul#{idatt}#{role}>)
+    list += node.content.map { |item|
+      li = %(<li><p>#{item.text}</p>)
+      li += item.content if item.blocks?
+      li += %(</li>)
+    }.join("")
+    list += %(</ul>)
   end
 
   def template
