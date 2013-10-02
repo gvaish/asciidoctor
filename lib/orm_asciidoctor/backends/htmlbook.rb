@@ -467,12 +467,7 @@ end
 
 class BlockParagraphTemplate < BaseTemplate
   def result(node)
-    id_attribute = node.id ? %( id="#{node.id}") : nil
-    title_element = node.title? ? %(<div class="title">#{node.title}</div>\n) : nil
-
-    %(<div#{id_attribute} class="#{!node.role? ? 'paragraph' : ['paragraph', node.role] * ' '}">
-#{title_element}<p>#{node.content}</p>
-</div>)
+    %(<p>#{node.content}</p>)
   end
 
   def template
@@ -571,25 +566,21 @@ end
 
 class BlockQuoteTemplate < BaseTemplate
   def result(node)
-    id_attribute = node.id ? %( id="#{node.id}") : nil
-    classes = ['quoteblock', node.role].compact
-    class_attribute = %( class="#{classes * ' '}")
-    title_element = node.title? ? %(\n<div class="title">#{node.title}</div>) : nil
-    attribution = (node.attr? 'attribution') ? (node.attr 'attribution') : nil
-    citetitle = (node.attr? 'citetitle') ? (node.attr 'citetitle') : nil
-    if attribution || citetitle
-      cite_element = citetitle ? %(<cite>#{citetitle}</cite>) : nil
-      attribution_text = attribution ? %(#{citetitle ? "<br>\n" : nil}&#8212; #{attribution}) : nil
-      attribution_element = %(\n<div class="attribution">\n#{cite_element}#{attribution_text}\n</div>)
-    else
-      attribution_element = nil
+    role = stratt(node, 'class', :role)
+    quote = %(<blockquote data-type="epigraph"#{role}>#{node.content.chomp})
+    
+    if node.attr?(:attribution) or node.attr?(:citetitle)
+      quote += %(<p data-type="attribution">)
+      if node.attr?(:citetitle)
+        quote += %(<cite>#{node.attr(:citetitle)}</cite>) 
+      end
+      if node.attr?(:attribution)
+        quote += %(<br />) if node.attr?(:citetitle)
+        quote += %(&#8212; #{node.attr(:attribution)})
+      end
     end
-
-    %(<div#{id_attribute}#{class_attribute}>#{title_element}
-<blockquote>
-#{node.content}
-</blockquote>#{attribution_element}
-</div>)
+    quote += %(</blockquote>)
+    quote
   end
 
   def template
