@@ -1,20 +1,14 @@
 require 'orm_asciidoctor/backends/_stylesheets'
 
 module Asciidoctor
-module HTMLBook
 
-#class BaseTemplate
-#  # create template matter to insert a style class from the role attribute if specified
-#  def role_class
-#    %(<%= role? ? " \#{role}" : nil %>)
-#  end
-#
-#  # create template matter to insert a style class from the style attribute if specified
-#  def style_class(sibling = true)
-#    delimiter = sibling ? ' ' : ''
-#    %(<%= @style && "#{delimiter}\#{@style}" %>)
-#  end
-#end
+  class BaseTemplate
+    def stratt(node, name, key)
+      node.attr?("#{key}") ? %( #{name}="#{node.attr("#{key}")}") : nil
+    end
+  end
+
+module HTMLBook
 
 class DocumentTemplate < BaseTemplate
   def self.outline(node, to_depth = 2)
@@ -538,13 +532,11 @@ end
 class BlockSidebarTemplate < BaseTemplate
   def result(node)
     id_attribute = node.id ? %( id="#{node.id}") : nil
-    title_element = node.title? ? %(<div class="title">#{node.title}</div>\n) : nil
-
-    %(<div#{id_attribute} class="#{!node.role? ? 'sidebarblock' : ['sidebarblock', node.role] * ' '}">
-<div class="content">
-#{title_element}#{node.content}
-</div>
-</div>)
+    role_attribute   = node.attr?('role') ? %( class="#{node.attr('width')}") : nil
+    %(<aside#{id_attribute} data-type="sidebar" class="sidebar#{role_attribute}">
+<h5>#{node.title}</h5>
+#{node.content}
+</aside>)
   end
 
   def template
@@ -931,12 +923,12 @@ end
 
 class BlockVideoTemplate < BaseTemplate
   def result(node)
-    id_attribute     = node.id ? %( id="#{node.id}") : nil
-    role_attribute   = node.attr?('role') ? %( class="#{node.attr('width')}") : nil
-    width_attribute  = node.attr?('width') ? %( width="#{node.attr 'width'}") : nil
-    height_attribute = node.attr?('height') ? %( height="#{node.attr 'height'}") : nil
-    poster_attribute = node.attr?('poster') ? %( poster="#{node.attr 'poster'}") : nil
-    %(<video#{id_attribute}#{role_attribute}#{width_attribute}#{height_attribute} controls="controls"#{poster_attribute}>
+    idatt  = node.id ? %( id="#{node.id}") : nil
+    role   = stratt(node, 'class', :role)
+    width  = stratt(node, 'width', :width)
+    height = stratt(node, 'height', :height)
+    poster = stratt(node, 'poster', :poster)
+    %(<video#{idatt}#{role}#{width}#{height} controls="controls"#{poster}>
 <source src="#{node.media_uri(node.attr 'target')}"/>
 Sorry, the &lt;video&gt; element is not supported in your reading system.
 </video>)
