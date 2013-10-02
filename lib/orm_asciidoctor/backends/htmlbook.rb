@@ -430,42 +430,9 @@ end
 
 class BlockListingTemplate < BaseTemplate
   def result(node)
-    nowrap = (!node.document.attr? 'prewrap') || (node.option? 'nowrap')
-    if node.style == 'source'
-      language = node.attr 'language'
-      language_classes = language ? %(#{language} language-#{language}) : nil
-      case node.attr 'source-highlighter'
-      when 'coderay'
-        pre_class = nowrap ? ' class="CodeRay nowrap"' : ' class="CodeRay"'
-        code_class = language ? %( class="#{language_classes}") : nil
-      when 'pygments'
-        pre_class = nowrap ? ' class="pygments highlight nowrap"' : ' class="pygments highlight"'
-        code_class = language ? %( class="#{language_classes}") : nil
-      when 'highlightjs', 'highlight.js'
-        pre_class = nowrap ? ' class="highlight nowrap"' : ' class="highlight"'
-        code_class = language ? %( class="#{language_classes}") : nil
-      when 'prettify'
-        pre_class = %( class="prettyprint#{nowrap ? ' nowrap' : nil}#{(node.attr? 'linenums') ? ' linenums' : nil})
-        pre_class = language ? %(#{pre_class} #{language_classes}") : %(#{pre_class}")
-        code_class = nil
-      when 'html-pipeline'
-        pre_class = language ? %( lang="#{language}") : nil
-        code_class = nil
-      else
-        pre_class = nowrap ? ' class="highlight nowrap"' : ' class="highlight"'
-        code_class = language ? %( class="#{language_classes}") : nil
-      end
-      pre = %(<pre#{pre_class}><code#{code_class}>#{preserve_endlines(node.content, node)}</code></pre>)
-    else
-      pre = %(<pre#{nowrap ? ' class="nowrap"' : nil}>#{preserve_endlines(node.content, node)}</pre>)
-    end
-
-    %(<div#{node.id && " id=\"#{node.id}\""} class="listingblock#{node.role && " #{node.role}"}">#{node.title? ? "
-<div class=\"title\">#{node.captioned_title}</div>" : nil}
-<div class="content">
-#{pre}
-</div>
-</div>)
+    idatt = node.id? ? %( id=#{node.id}) : nil
+    lang = node.attr?('style', 'source', false) ? %(data-code-language="#{node.attr('language')}") : nil
+    %(<pre#{idatt} data-type="programlisting" class="programlisting"#{lang}>#{node.content}</pre>)
   end
 
   def template
