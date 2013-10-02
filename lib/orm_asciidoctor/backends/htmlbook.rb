@@ -1026,7 +1026,25 @@ class InlineQuotedTemplate < BaseTemplate
   end
 
   def result(node)
-    quote_text(node.text, node.type, node.id, node.role)
+    text_span = node.attr?('role') ? %(<span class="#{node.attr('role')}">#{node.text}</span>) : node.text
+    case node.type
+    when :emphasis
+      %(<em>#{text_span}</em>)
+    when :strong
+      %(<strong>#{text_span}</strong>)
+    when :monospaced
+      %(<code>#{text_span}</code>)
+    when :superscript
+      %(<sup>#{text_span}</sup>)
+    when :subscript
+      %(<sub>#{text_span}</sub>)
+    when :double
+      %(&#8220;#{text_span}&#8221;)
+    when :single
+      %(&#8216;#{text_span}&#8217;)
+    else
+      text_span
+    end
   end
 
   def template
@@ -1107,57 +1125,22 @@ class InlineAnchorTemplate < BaseTemplate
 end
 
 class InlineImageTemplate < BaseTemplate
-  def image(target, type, node)
-    if type == 'icon' && (node.document.attr? 'icons', 'font') 
-      style_class = "icon-#{target}"
-      if node.attr? 'size'
-        style_class = "#{style_class} icon-#{node.attr 'size'}"
-      end
-      if node.attr? 'rotate'
-        style_class = "#{style_class} icon-rotate-#{node.attr 'rotate'}"
-      end
-      if node.attr? 'flip'
-        style_class = "#{style_class} icon-flip-#{node.attr 'flip'}"
-      end
-      title_attribute = (node.attr? 'title') ? %( title="#{node.attr 'title'}") : nil
-      img = %(<i class="#{style_class}"#{title_attribute}></i>)
-    elsif type == 'icon' && !(node.document.attr? 'icons')
-      img = "[#{node.attr 'alt'}]"
-    else
-      if type == 'icon'
-        resolved_target = node.icon_uri target
-      else
-        resolved_target = node.image_uri target
-      end
-
-      attrs = ['alt', 'width', 'height', 'title'].map {|name|
-        if node.attr? name
-          %( #{name}="#{node.attr name}")
-        else
-          nil
-        end
-      }.join
-
-      img = %(<img src="#{resolved_target}"#{attrs}>)
-    end
-
-    if node.attr? 'link'
-      img = %(<a class="image" href="#{node.attr 'link'}"#{(node.attr? 'window') ? " target=\"#{node.attr 'window'}\"" : nil}>#{img}</a>)
-    end
-
-    if node.role?
-      style_classes = %(#{type} #{node.role})
-    else
-      style_classes = type
-    end
-
-    style_attr = (node.attr? 'float') ? %( style="float: #{node.attr 'float'}") : nil
-
-    %(<span class="#{style_classes}"#{style_attr}>#{img}</span>)
-  end
 
   def result(node)
-    image(node.target, node.type, node)
+    extra_class = node.attr?('role') ? %( #{node.attr('role')}) : nil
+    img = %(<span class="image#{extra_class}">)
+
+    if node.attr? 'link'
+      img += %(<a class="image" href="#{node.attr('link')}">)
+    end
+    img += %(<img src="<%= image_uri(@target) %>" alt="<%= attr 'alt' %><%= attr?('width') ? %( width="#{attr 'width'}") : nil %><%= attr?('height') ? %( height="#{attr 'height'}") : nil %>"/>)
+
+    if node.attr? 'link'
+      img += "</a>"
+    end
+
+    img += %(</span>)
+    img
   end
 
   def template
