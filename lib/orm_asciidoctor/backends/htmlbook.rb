@@ -442,13 +442,7 @@ end
 
 class BlockLiteralTemplate < BaseTemplate
   def result(node)
-    nowrap = (!node.document.attr? 'prewrap') || (node.option? 'nowrap')
-    %(<div#{node.id && " id=\"#{node.id}\""} class="literalblock#{node.role && " #{node.role}"}">#{node.title? ? "
-<div class=\"title\">#{node.title}</div>" : nil}
-<div class="content">
-<pre#{nowrap ? ' class="nowrap"' : nil}>#{preserve_endlines(node.content, node)}</pre>
-</div>
-</div>)
+    %(<pre>#{node.content}</pre>)
   end
 
   def template
