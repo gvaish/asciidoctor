@@ -256,12 +256,12 @@ class BlockDlistTemplate < BaseTemplate
         li = %(<li>)
         li += [*terms].map { |dt|
           %(<p><em>#{dt.text}</em></p>)
-        }.join("")
+        }.join
         li += %(<p>#{dd.text}</p>)  if !dd.nil? && dd.text?
         li += dd.content.chomp      if !dd.nil? && dd.blocks?
         li += %(</li>)
         li
-      }.join("")
+      }.join
       list += %(</ol></div>)
     
     elsif node.attr?('style', 'horizontal', false)
@@ -282,13 +282,13 @@ class BlockDlistTemplate < BaseTemplate
         li = %(<tr><td class="hdlist1#{strong_option}">)
         li += [*terms].map { |dt|
           %(#{dt.text}<br>)
-        }.join("")
+        }.join
         li += %(</td><td class="hdlist2">)
         li += %(<p style="margin-top: 0;">#{dd.text}</p>)  if !dd.nil? && dd.text?
         li += dd.content.chomp                             if !dd.nil? && dd.blocks?
         li += %(</td></tr></table></div>)
         li
-      }.join("")
+      }.join
 
     else
 
@@ -299,7 +299,7 @@ class BlockDlistTemplate < BaseTemplate
         sty = !node.attr?('style', nil, false) ? %( class="hdlist") : nil
         li = [*terms].map { |dt|
           %(<dt#{sty}>#{dt.text}</dt>)
-        }.join("")
+        }.join
         unless dd.nil?
           li += %(<dd>)
           li += %(<p>#{dd.text}</p>)  if dd.text?
@@ -307,7 +307,7 @@ class BlockDlistTemplate < BaseTemplate
           li += %(</dd>)
         end
         li
-      }.join("")
+      }.join
       list += %(</dl></div>)
 
     end
@@ -513,7 +513,7 @@ class BlockUlistTemplate < BaseTemplate
       li = %(<li><p>#{item.text}</p>)
       li += item.content if item.blocks?
       li += %(</li>)
-    }.join("")
+    }.join
     list += %(</ul>)
   end
 
@@ -532,7 +532,7 @@ class BlockOlistTemplate < BaseTemplate
       li = %(<li><p>#{item.text}</p>)
       li += item.content if item.blocks?
       li += %(</li>)
-    }.join("")
+    }.join
     list += %(</ol>)
   end
 
@@ -587,45 +587,79 @@ class BlockColistTemplate < BaseTemplate
 end
 
 class BlockTableTemplate < BaseTemplate
+  def result(node)
+    idatt = node.id ? %( id="#{node.id}") : nil
+    role = stratt(node, 'class', :role)
+
+    table = %(<table#{idatt}#{role}>)
+    
+    if node.title?
+      caption_title = node.document.attributes["table-caption"]
+      caption_num = node.document.attributes["table-number"]
+      section_num = node.next_section_index += 1
+      table += %(<caption>
+    <span data-type="label">
+      #{caption_title} #{section_num}-#{caption_num}.
+    </span> <%= node.title %>
+  </caption>)
+    end
+
+    if node.attr('rowcount') >= 0
+      
+      table += %(<colgroup>)
+      if node.attr?('autowidth-option')
+        table += node.columns.map { |col|
+          %(<col>)
+        }.join
+      else
+        table += node.columns.map { |col|
+          %(<col style="width:#{col.attr('colpcwidth')}%;"/>)
+        }.join
+      end
+      table += %(</colgroup>)
+
+      table += [:head, :foot, :body].select { |tsec| 
+        !node.rows[tsec].empty?
+      }.map { |tsec|
+        
+        sec = %(<t#{tsec}>)
+        sec += node.rows[tsec].map { |row|
+          
+          tr = %(<tr>)
+          tr += row.map { |cell|
+
+            colspan = cell.colspan ? %( colspan="#{cell.colspan}") : nil
+            rowspan = cell.rowspan ? %( rowspan="#{cell.rowspan}") : nil
+            tagname   = tsec == :head ? 'th' : 'td'
+            
+            single = %(<#{tagname}#{colspan}#{rowspan}>)
+            if tsec == :head
+              single += cell.text
+            else 
+              if cell.attr('style', nil, false) == :asciidoc
+                single += %(<div>#{cell.content}</div>)
+              else
+                single += cell.content.map { |text|
+                  %(<p#{role}>#{text}</p>)
+                }.join
+              end
+            end
+            single += %(</#{tagname}>)
+            single
+          }
+          tr += %(</tr>)
+          tr
+        }.join
+        sec +=  %(</t#{tsec}>)
+        sec
+      }.join
+    end
+
+    table += %(</table>)
+  end
+
   def template
-    @template ||= @eruby.new <<-EOS
-<%#encoding:UTF-8%><table<%= @id && %( id="#{@id}") %><%= attr?('role') ? %( class="#{attr 'role'}") : nil %>>
-<% if title? %>
-<caption><span data-type="label"><%= caption_title = @document.attributes["table-caption"]
-caption_num = @document.attributes["table-number"]
-section_num = @next_section_index += 1
-@caption = "#{caption_title} #{section_num}-#{caption_num}."%></span> <%= title %></caption><% end %><%
-if (attr 'rowcount') >= 0 %>
-<colgroup><%
-if attr? 'autowidth-option' %><%
-@columns.each do %>
-<col><%
-end %><%
-else %><%
-@columns.each do |col| %>
-<col style="width:<%= col.attr 'colpcwidth' %>%;"/><%
-end %><%
-end %>
-</colgroup><%
-[:head, :foot, :body].select {|tsec| !@rows[tsec].empty? }.each do |tsec| %>
-<t<%= tsec %>><%
-@rows[tsec].each do |row| %>
-<tr><%
-row.each do |cell| %>
-<<%= tsec == :head ? 'th' : 'td' %><%= cell.colspan ? %( colspan="#{cell.colspan}") : nil %><%= cell.rowspan ? %( rowspan="#{cell.rowspan}") : nil %>><% 
-if tsec == :head %><%= cell.text %><% else %><% 
-case cell.attr('style', nil, false)
-when :asciidoc %><div><%= cell.content %></div><%
-else %><% cell.content.each do |text| %><p<%= attr?('role') ? %( class="#{attr 'role'}") : nil %>><%= text %></p><% end %><%
-end %><% end %></<%= tsec == :head ? 'th' : 'td' %>><%
-end %>
-</tr><%
-end %>
-</t<%= tsec %>><%
-end %><%
-end %>
-</table>
-    EOS
+    :invoke_result
   end
 end
 
