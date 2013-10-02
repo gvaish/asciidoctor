@@ -265,51 +265,61 @@ class BlockPreambleTemplate < BaseTemplate
 end
 
 class SectionTemplate < BaseTemplate
+  
   def result(sec)
-    slevel = sec.level
-    # QUESTION should this check be done in section?
-    if slevel == 0 && sec.special
-      slevel = 1
-    end
-    htag = "h#{slevel + 1}"
-    id = anchor = link_start = link_end = nil
-    if sec.id
-      id = %( id="#{sec.id}")
-      if sec.document.attr? 'sectanchors'
-        #if sec.document.attr? 'icons', 'font'
-        #  anchor = %(<a class="anchor" href="##{sec.id}"><i class="icon-anchor"></i></a>)
-        #else
-          anchor = %(<a class="anchor" href="##{sec.id}"></a>)
-        #end
-      elsif sec.document.attr? 'sectlinks'
-        link_start = %(<a class="link" href="##{sec.id}">)
-        link_end = '</a>'
-      end
-    end
+    idatt = sec.id ? %( id="#{sec.id}") : nil
 
-    if slevel == 0
-      %(<h1#{id} class="sect0">#{anchor}#{link_start}#{sec.title}#{link_end}</h1>
-#{sec.content})
-    else
-      role = sec.role? ? " #{sec.role}" : nil
-      if sec.numbered
-        sectnum = "#{sec.sectnum} "
-      else
-        sectnum = nil
-      end
-
-      if slevel == 1
-        content = %(<div class="sectionbody">
-#{sec.content}
-</div>)
-      else
-        content = sec.content
-      end
-      %(<div class="sect#{slevel}#{role}">
-<#{htag}#{id}>#{anchor}#{link_start}#{sectnum}#{sec.captioned_title}#{link_end}</#{htag}>
-#{content}
-</div>)
+    # stuff before tag
+    if sec.level > 0
+      title_html = %(#{sec.caption}#{sec.title})
+      title_html = %(<a name="#{sec.id}" class="anchor" href="#{sec.id}">#{title_html}</a>) if sec.attr?('anchors')
+      title_html = %(#{sec.sectnum} #{title_html}) if !sec.special && sec.attr?('numbered') && sec.level < 4
     end
+    
+    if sec.level == 0
+      
+      %(#{title_html}
+    <div data-type="part"#{idatt}>
+      <h1>#{sec.title}</h1>
+      #{sec.content}
+    </div>)
+    
+    elsif sec.level == 1
+      
+      if sec.sectname == 'preface[@role="foreword"]'
+        %(#{title_html}
+    <section data-type="foreword"#{idatt}>
+      <h#{sec.level}>#{sec.title}</h#{sec.level}>
+      #{sec.content}
+    </section>)
+      elsif sec.sectname == 'preface'
+        %(#{title_html}
+    <section data-type="preface"#{idatt}>
+      <h#{sec.level}>#{sec.title}</h#{sec.level}>
+      #{sec.content}
+    </section>)
+      elsif sec.sectname == 'appendix'
+        %(#{title_html}
+    <section data-type="appendix"#{idatt}>
+      <h#{sec.level}>#{sec.title}</h#{sec.level}>
+      #{sec.content}
+    </section>)
+      else
+        %(#{title_html}
+    <section data-type="chapter"#{idatt}>
+      <h#{sec.level}>#{sec.title}</h#{sec.level}>
+      #{sec.content}
+    </section>)
+      end
+    
+    elsif sec.level > 1 && sec.level < 6
+      %(#{title_html}
+    <section data-type="sect#{sec.level-1}"#{idatt}>
+      <h#{sec.level-1}>#{sec.title}</h#{sec.level-1}>
+      #{sec.content}
+    </section>)  
+    end  
+    
   end
 
   def template
@@ -995,35 +1005,6 @@ class InlineCalloutTemplate < BaseTemplate
 end
 
 class InlineQuotedTemplate < BaseTemplate
-  NO_TAGS = [nil, nil, nil]
-
-  QUOTE_TAGS = {
-    :emphasis => ['<em>', '</em>', true],
-    :strong => ['<strong>', '</strong>', true],
-    :monospaced => ['<code>', '</code>', true],
-    :superscript => ['<sup>', '</sup>', true],
-    :subscript => ['<sub>', '</sub>', true],
-    :double => ['&#8220;', '&#8221;', false],
-    :single => ['&#8216;', '&#8217;', false]
-  }
-
-  def quote_text(text, type, id, role)
-    open, close, is_tag = QUOTE_TAGS[type] || NO_TAGS
-    anchor = id.nil? ? nil : %(<a id="#{id}"></a>)
-    if role
-      if is_tag
-        quoted_text = %(#{open.chop} class="#{role}">#{text}#{close})
-      else
-        quoted_text = %(<span class="#{role}">#{open}#{text}#{close}</span>)
-      end
-    elsif open.nil?
-      quoted_text = text
-    else
-      quoted_text = %(#{open}#{text}#{close})
-    end
-
-    anchor.nil? ? quoted_text : %(#{anchor}#{quoted_text})
-  end
 
   def result(node)
     text_span = node.attr?('role') ? %(<span class="#{node.attr('role')}">#{node.text}</span>) : node.text
