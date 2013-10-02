@@ -36,41 +36,48 @@ class DocumentTemplate < BaseTemplate
     toc_level_buffer * EOL
   end
 
-  def template
-    @template ||= @eruby.new <<-EOS
-<%#encoding:UTF-8%><!DOCTYPE html>
-
-<html xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  def result(node)
+    idatt = node.id ? %( id="#{node.id}") : nil
+    author_copyright = node.attr?(:author) ? %(<h2 data-type="author">#{node.attr(:author)}</h2>) : nil
+    author_dedication = node.attr?(:author) ? %(<p data-type="author">by #{node.attr(:author)}</p>) : nil
+    
+    doc = %(<!DOCTYPE html>
+  <html xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 xsi:schemaLocation="http://www.w3.org/1999/xhtml ../schema/htmlbook.xsd"
 xmlns="http://www.w3.org/1999/xhtml">
 
   <head>
-    <title><%= doctitle %></title>
-    <meta name="<%= doctitle %>" content="text/html; charset=utf-8"/>
+    <title>#{node.doctitle}</title>
+    <meta name="#{node.doctitle}" content="text/html; charset=utf-8"/>
   </head>
-<body<%= @id && %( id="#{@id}") %> data-type="book">
-  <h1><%= @header.title %></h1>
-  <figure data-type="cover">
-    <img src="cover.png"/>
-  </figure>
-  <section data-type="titlepage">
-    <h1><%= @header.title %></h1>
-    <% if attr? :author %><h2 data-type="author"><%= attr :author %></h2><% end %>
-  </section>
-  <section data-type="copyright-page">
-    <h1><%= @header.title %></h1>
-    <% if attr? :author %><p data-type="author">by <%= attr :author %></p><% end %>
-  </section>
-<% if @level == 1 && @role == 'dedication' %>
-<section data-type="dedication"<%= @id && %( id="#{@id}") %>>
-<%= %(<h#{@level}) %>><%= title %><%= %(</h#{@level}>) %>
+  <body#{idatt} data-type="book">
+    <h1>#{node.header.title}</h1>
+    <figure data-type="cover">
+      <img src="cover.png"/>
+    </figure>
+    <section data-type="titlepage">
+      <h1>#{node.header.title}</h1>
+      #{author_copyright}
+    </section>  
+    <section data-type="copyright-page">
+      <h1>#{node.header.title}</h1>
+      #{author_dedication}
+    </section>)
 
-<%= content %>
-</section><% end %>
-<%= content %>
-</body>
-</html>
-    EOS
+  if node.level == 1 && node.role == 'dedication'
+    doc += %(<section data-type="dedication">
+  <h#{node.level}>#{node.title}</h#{node.level}>
+</section>)
+  end
+
+  doc += node.content
+  doc += %(</body>
+</html>)
+  doc
+  end
+
+  def template
+    :invoke_result
   end
 end
 
@@ -174,8 +181,7 @@ class SectionTemplate < BaseTemplate
     
     if sec.level == 0
       
-      %(#{title_html}
-    <div data-type="part"#{idatt}>
+      %(<div data-type="part"#{idatt}>
       <h1>#{sec.title}</h1>
       #{sec.content}
     </div>)
@@ -183,34 +189,29 @@ class SectionTemplate < BaseTemplate
     elsif sec.level == 1
       
       if sec.sectname == 'preface[@role="foreword"]'
-        %(#{title_html}
-    <section data-type="foreword"#{idatt}>
+        %(<section data-type="foreword"#{idatt}>
       <h#{sec.level}>#{sec.title}</h#{sec.level}>
       #{sec.content}
     </section>)
       elsif sec.sectname == 'preface'
-        %(#{title_html}
-    <section data-type="preface"#{idatt}>
+        %(<section data-type="preface"#{idatt}>
       <h#{sec.level}>#{sec.title}</h#{sec.level}>
       #{sec.content}
     </section>)
       elsif sec.sectname == 'appendix'
-        %(#{title_html}
-    <section data-type="appendix"#{idatt}>
+        %(<section data-type="appendix"#{idatt}>
       <h#{sec.level}>#{sec.title}</h#{sec.level}>
       #{sec.content}
     </section>)
       else
-        %(#{title_html}
-    <section data-type="chapter"#{idatt}>
+        %(<section data-type="chapter"#{idatt}>
       <h#{sec.level}>#{sec.title}</h#{sec.level}>
       #{sec.content}
     </section>)
       end
     
     elsif sec.level > 1 && sec.level < 6
-      %(#{title_html}
-    <section data-type="sect#{sec.level-1}"#{idatt}>
+      %(<section data-type="sect#{sec.level-1}"#{idatt}>
       <h#{sec.level-1}>#{sec.title}</h#{sec.level-1}>
       #{sec.content}
     </section>)  
@@ -237,90 +238,86 @@ class BlockFloatingTitleTemplate < BaseTemplate
 end
 
 class BlockDlistTemplate < BaseTemplate
-  def result(node)
-    result_buffer = []
-    id_attribute = node.id ? %( id="#{node.id}") : nil
-
-    case node.style
-    when 'qanda'
-      classes = ['qlist', node.style, node.role].compact
-    when 'horizontal'
-      classes = ['hdlist', node.role].compact
-    else
-      classes = ['dlist', node.style, node.role].compact
-    end
-
-    class_attribute = %( class="#{classes * ' '}")
-
-    result_buffer << %(<div#{id_attribute}#{class_attribute}>)
-    result_buffer << %(<div class="title">#{node.title}</div>) if node.title?
-    case node.style
-    when 'qanda'
-      result_buffer << '<ol>'
-      node.items.each do |terms, dd|
-        result_buffer << '<li>'
-        [*terms].each do |dt|
-          result_buffer << %(<p><em>#{dt.text}</em></p>)
-        end
-        unless dd.nil?
-          result_buffer << %(<p>#{dd.text}</p>) if dd.text?
-          result_buffer << dd.content if dd.blocks?
-        end
-        result_buffer << '</li>'
-      end
-      result_buffer << '</ol>'
-    when 'horizontal'
-      result_buffer << '<table>'
-      if (node.attr? 'labelwidth') || (node.attr? 'itemwidth')
-        result_buffer << '<colgroup>'
-        col_style_attribute = (node.attr? 'labelwidth') ? %( style="width:#{(node.attr 'labelwidth').chomp '%'}%;") : nil
-        result_buffer << %(<col#{col_style_attribute}>)
-        col_style_attribute = (node.attr? 'itemwidth') ? %( style="width:#{(node.attr 'itemwidth').chomp '%'}%;") : nil
-        result_buffer << %(<col#{col_style_attribute}>)
-        result_buffer << '</colgroup>'
-      end
-      node.items.each do |terms, dd|
-        result_buffer << '<tr>'
-        result_buffer << %(<td class="hdlist1#{(node.option? 'strong') ? ' strong' : nil}">)
-        terms_array = [*terms]
-        last_term = terms_array.last
-        terms_array.each do |dt|
-          result_buffer << dt.text
-          result_buffer << '<br>' if dt != last_term
-        end
-        result_buffer << '</td>'
-        result_buffer << '<td class="hdlist2">'
-        unless dd.nil?
-          result_buffer << %(<p>#{dd.text}</p>) if dd.text?
-          result_buffer << dd.content if dd.blocks?
-        end
-        result_buffer << '</td>'
-        result_buffer << '</tr>'
-      end
-      result_buffer << '</table>'
-    else
-      result_buffer << '<dl>'
-      dt_style_attribute = node.style.nil? ? ' class="hdlist1"' : nil
-      node.items.each do |terms, dd|
-        [*terms].each do |dt|
-          result_buffer << %(<dt#{dt_style_attribute}>#{dt.text}</dt>)
-        end
-        unless dd.nil?
-          result_buffer << '<dd>'
-          result_buffer << %(<p>#{dd.text}</p>) if dd.text?
-          result_buffer << dd.content if dd.blocks?
-          result_buffer << '</dd>'
-        end
-      end
-      result_buffer << '</dl>'
-    end
-
-    result_buffer << '</div>'
-    result_buffer * EOL
-  end
-
   def template
-    :invoke_result
+    @template ||= @eruby.new "something"
+#    @template ||= @eruby.new <<-EOS
+#<%#encoding:UTF-8%><%
+#if attr? 'style', 'qanda', false %>
+#<div<%= @id && %( id="#{@id}") %> class="qlist<%= attr?('style') ? %( #{attr('style')}) : nil %><%= attr?('role') ? %( #{attr 'role'}) : #nil %>"><%= title? ? %(
+#<div class="title">#{title}</div>) : nil %>
+#<ol><%
+#items.each do |terms, dd| %>
+#<li><%
+#[*terms].each do |dt| %>
+#<p><em><%= dt.text %></em></p><%
+#end
+#unless dd.nil? %><%
+#if dd.text? %>
+#<p><%= dd.text %></p><%
+#end %><%
+#if dd.blocks? %>
+#<%= dd.content.chomp %><%
+#end %><%
+#end %>
+#</li><%
+#end %>
+#</ol>
+#</div><%
+#elsif attr? 'style', 'horizontal', false %>
+#<div<%= @id && %( id="#{@id}") %> class="hdlist<%= attr?('role') ? %( #{attr 'role'}) : nil %>"><%= title? ? %(
+#<div class="title">#{title}</div>) : nil %>
+#<table>
+#<colgroup>
+#<col<% if attr? 'labelwidth' %> style="width:<%= attr 'labelwidth' %>%;"<% end %>>
+#<col<% if attr? 'itemwidth' %> style="width:<%= attr 'itemwidth' %>%;"<% end %>>
+#</colgroup><%
+#items.each do |terms, dd| %>
+#<tr>
+#<td class="hdlist1<% if attr? 'strong-option' %> strong<% end %>"><%
+#[*terms].each do |dt| %>
+#<%= dt.text %>
+#<br><%
+#end %>
+#</td>
+#<td class="hdlist2"><%
+#unless dd.nil? %><%
+#if dd.text? %>
+#<p style="margin-top: 0;"><%= dd.text %></p><%
+#end %><%
+#if dd.blocks? %>
+#<%= dd.content.chomp %><%
+#end %><%
+#end %>
+#</td>
+#</tr><%
+#end %>
+#</table>
+#</div><%
+#else %>
+#<div<%= @id && %( id="#{@id}") %> class="dlist<%= attr?('style') ? %( #{attr 'style'}) : nil %><%= attr?('role') ? %( #{attr 'role'}) : #nil %>"><%= title? ? %(
+#<div class="title">#{title}</div>) : nil %>
+#<dl><%
+#items.each do |terms, dd|
+#[*terms].each do |dt| %>
+#<dt<%= !(attr? 'style', nil, false) ? ' class="hdlist"' : nil %>>
+#<%= dt.text %>
+#</dt><%
+#end
+#unless dd.nil? %>
+#<dd><%
+#if dd.text? %>
+#<p><%= dd.text %></p><%
+#end %><%
+#if dd.blocks? %>
+#<%= dd.content.chomp %><%
+#end %>
+#</dd><%
+#end %><%
+#end %>
+#</dl>
+#</div><%
+#end %>
+#    EOS
   end
 end
 
