@@ -6,6 +6,9 @@ module Asciidoctor
     def stratt(node, name, key)
       node.attr?("#{key}") ? %( #{name}="#{node.attr("#{key}")}") : nil
     end
+    def strkey(node, key)
+      node.attr?("#{key}") ? %( #{node.attr("#{key}")}) : nil
+    end
   end
 
 module HTMLBook
@@ -238,92 +241,86 @@ class BlockFloatingTitleTemplate < BaseTemplate
 end
 
 class BlockDlistTemplate < BaseTemplate
+  
+  def result(node)
+    idatt = node.id ? %( id="#{node.id}") : nil
+    role = strkey(node, 'role')
+    style = strkey(node, 'style')
+    list = ""
+    
+    if node.attr?('style', 'qanda', false)
+      list += %(<div#{idatt} class="qlist#{style}#{role}">)
+      list += %(<div class="title">#{node.title}</div>) if node.title?
+      list += %(<ol>)
+      list += node.items.map { |terms, dd|
+        li = %(<li>)
+        li += [*terms].map { |dt|
+          %(<p><em>#{dt.text}</em></p>)
+        }.join("")
+        li += %(<p>#{dd.text}</p>)  if !dd.nil? && dd.text?
+        li += dd.content.chomp      if !dd.nil? && dd.blocks?
+        li += %(</li>)
+        li
+      }.join("")
+      list += %(</ol></div>)
+    
+    elsif node.attr?('style', 'horizontal', false)
+      
+      labelwidth = node.attr?('labelwidth') ? %( style="width:#{node.attr('labelwidth')}%;") : nil
+      itemwidth = node.attr?('itemwidth') ? %( style="width:#{node.attr('itemwidth')}%;") : nil
+
+      list += %(<div#{idatt} class="hdlist#{role}">)
+      list += %(<div class="title">#{node.title}</div>) if node.title?
+      list += %(<table>
+  <colgroup>
+    <col#{labelwidth}>
+    <col#{itemwidth}>
+  </colgroup>)
+
+      list += node.items.map { |terms, dd|
+        strong_option = node.attr?('strong-option') ? " strong" : nil
+        li = %(<tr><td class="hdlist1#{strong_option}">)
+        li += [*terms].map { |dt|
+          %(#{dt.text}<br>)
+        }.join("")
+        li += %(</td><td class="hdlist2">)
+        li += %(<p style="margin-top: 0;">#{dd.text}</p>)  if !dd.nil? && dd.text?
+        li += dd.content.chomp                             if !dd.nil? && dd.blocks?
+        li += %(</td></tr></table></div>)
+        li
+      }.join("")
+
+    else
+
+      list += %(<div#{idatt} class="dlist#{style}#{role}">)
+      list += %(<div class="title">#{node.title}</div>) if node.title?
+      list += %(<dl>)
+      list += node.items.map { |terms, dd|
+        sty = !node.attr?('style', nil, false) ? %( class="hdlist") : nil
+        li = [*terms].map { |dt|
+          %(<dt#{sty}>#{dt.text}</dt>)
+        }.join("")
+        unless dd.nil?
+          li += %(<dd>)
+          li += %(<p>#{dd.text}</p>)  if dd.text?
+          li += dd.content.chomp      if dd.blocks?
+          li += %(</dd>)
+        end
+        li
+      }.join("")
+      list += %(</dl></div>)
+
+    end
+  end
+
   def template
-    @template ||= @eruby.new "something"
-#    @template ||= @eruby.new <<-EOS
-#<%#encoding:UTF-8%><%
-#if attr? 'style', 'qanda', false %>
-#<div<%= @id && %( id="#{@id}") %> class="qlist<%= attr?('style') ? %( #{attr('style')}) : nil %><%= attr?('role') ? %( #{attr 'role'}) : #nil %>"><%= title? ? %(
-#<div class="title">#{title}</div>) : nil %>
-#<ol><%
-#items.each do |terms, dd| %>
-#<li><%
-#[*terms].each do |dt| %>
-#<p><em><%= dt.text %></em></p><%
-#end
-#unless dd.nil? %><%
-#if dd.text? %>
-#<p><%= dd.text %></p><%
-#end %><%
-#if dd.blocks? %>
-#<%= dd.content.chomp %><%
-#end %><%
-#end %>
-#</li><%
-#end %>
-#</ol>
-#</div><%
-#elsif attr? 'style', 'horizontal', false %>
-#<div<%= @id && %( id="#{@id}") %> class="hdlist<%= attr?('role') ? %( #{attr 'role'}) : nil %>"><%= title? ? %(
-#<div class="title">#{title}</div>) : nil %>
-#<table>
-#<colgroup>
-#<col<% if attr? 'labelwidth' %> style="width:<%= attr 'labelwidth' %>%;"<% end %>>
-#<col<% if attr? 'itemwidth' %> style="width:<%= attr 'itemwidth' %>%;"<% end %>>
-#</colgroup><%
-#items.each do |terms, dd| %>
-#<tr>
-#<td class="hdlist1<% if attr? 'strong-option' %> strong<% end %>"><%
-#[*terms].each do |dt| %>
-#<%= dt.text %>
-#<br><%
-#end %>
-#</td>
-#<td class="hdlist2"><%
-#unless dd.nil? %><%
-#if dd.text? %>
-#<p style="margin-top: 0;"><%= dd.text %></p><%
-#end %><%
-#if dd.blocks? %>
-#<%= dd.content.chomp %><%
-#end %><%
-#end %>
-#</td>
-#</tr><%
-#end %>
-#</table>
-#</div><%
-#else %>
-#<div<%= @id && %( id="#{@id}") %> class="dlist<%= attr?('style') ? %( #{attr 'style'}) : nil %><%= attr?('role') ? %( #{attr 'role'}) : #nil %>"><%= title? ? %(
-#<div class="title">#{title}</div>) : nil %>
-#<dl><%
-#items.each do |terms, dd|
-#[*terms].each do |dt| %>
-#<dt<%= !(attr? 'style', nil, false) ? ' class="hdlist"' : nil %>>
-#<%= dt.text %>
-#</dt><%
-#end
-#unless dd.nil? %>
-#<dd><%
-#if dd.text? %>
-#<p><%= dd.text %></p><%
-#end %><%
-#if dd.blocks? %>
-#<%= dd.content.chomp %><%
-#end %>
-#</dd><%
-#end %><%
-#end %>
-#</dl>
-#</div><%
-#end %>
-#    EOS
+    :invoke_result
   end
 end
 
 class BlockListingTemplate < BaseTemplate
   def result(node)
-    idatt = node.id? ? %( id=#{node.id}) : nil
+    idatt = node.id ? %( id=#{node.id}) : nil
     lang = node.attr?('style', 'source', false) ? %(data-code-language="#{node.attr('language')}") : nil
     %(<pre#{idatt} data-type="programlisting" class="programlisting"#{lang}>#{node.content}</pre>)
   end
@@ -636,7 +633,7 @@ class BlockImageTemplate < BaseTemplate
 
   def result(node)
     
-    idatt = node.id? ? %( id=#{node.id}) : nil
+    idatt = node.id ? %( id=#{node.id}) : nil
     role = stratt(node, 'class', :role)
     alt = stratt(node, 'alt', :alt)
     width = stratt(node, 'width', :width)
