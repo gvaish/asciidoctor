@@ -27,7 +27,8 @@ EOS
 
   ## List your runtime dependencies here. Runtime dependencies are those
   ## that are needed for an end user to actually USE your code.
-  #s.add_dependency 'foo', '~> 1.0.0'
+  s.add_dependency 'libxml-ruby'
+  s.add_dependency 'libxslt-ruby'
 
   ## Development dependencies are libraries only needed during development or
   ## testing

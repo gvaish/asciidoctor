@@ -3,18 +3,18 @@ require 'orm_asciidoctor/backends/_stylesheets'
 module Asciidoctor
 module HTMLBook
 
-class BaseTemplate
-  # create template matter to insert a style class from the role attribute if specified
-  def role_class
-    %(<%= role? ? " \#{role}" : nil %>)
-  end
-
-  # create template matter to insert a style class from the style attribute if specified
-  def style_class(sibling = true)
-    delimiter = sibling ? ' ' : ''
-    %(<%= @style && "#{delimiter}\#{@style}" %>)
-  end
-end
+#class BaseTemplate
+#  # create template matter to insert a style class from the role attribute if specified
+#  def role_class
+#    %(<%= role? ? " \#{role}" : nil %>)
+#  end
+#
+#  # create template matter to insert a style class from the style attribute if specified
+#  def style_class(sibling = true)
+#    delimiter = sibling ? ' ' : ''
+#    %(<%= @style && "#{delimiter}\#{@style}" %>)
+#  end
+#end
 
 class DocumentTemplate < BaseTemplate
   def self.outline(node, to_depth = 2)
