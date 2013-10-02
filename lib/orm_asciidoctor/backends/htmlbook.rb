@@ -595,57 +595,40 @@ end
 class BlockTableTemplate < BaseTemplate
   def template
     @template ||= @eruby.new <<-EOS
-<%#encoding:UTF-8%><table<%= @id ? %( id="\#{@id}") : nil %> class="tableblock frame-<%= attr :frame, 'all' %> grid-<%= attr :grid, 'all'%><%= role? ? " \#{role}" : nil %>" style="<%
-if !(option? 'autowidth') %>width:<%= attr :tablepcwidth %>%; <% end %><%
-if attr? :float %>float: <%= attr :float %>; <% end %>"><%
-if title? %>
-<caption class="title"><%= captioned_title %></caption><%
-end
-if (attr :rowcount) >= 0 %>
+<%#encoding:UTF-8%><table<%= @id && %( id="#{@id}") %><%= attr?('role') ? %( class="#{attr 'role'}") : nil %>>
+<% if title? %>
+<caption><span data-type="label"><%= caption_title = @document.attributes["table-caption"]
+caption_num = @document.attributes["table-number"]
+section_num = @next_section_index += 1
+@caption = "#{caption_title} #{section_num}-#{caption_num}."%></span> <%= title %></caption><% end %><%
+if (attr 'rowcount') >= 0 %>
 <colgroup><%
-  if option? 'autowidth'
-    @columns.each do %>
+if attr? 'autowidth-option' %><%
+@columns.each do %>
 <col><%
-    end
-  else
-    @columns.each do |col| %>
-<col style="width:<%= col.attr :colpcwidth %>%;"><%
-    end
-  end %> 
+end %><%
+else %><%
+@columns.each do |col| %>
+<col style="width:<%= col.attr 'colpcwidth' %>%;"/><%
+end %><%
+end %>
 </colgroup><%
-  [:head, :foot, :body].select {|tsec| !@rows[tsec].empty? }.each do |tsec| %>
+[:head, :foot, :body].select {|tsec| !@rows[tsec].empty? }.each do |tsec| %>
 <t<%= tsec %>><%
-    @rows[tsec].each do |row| %>
+@rows[tsec].each do |row| %>
 <tr><%
-      row.each do |cell| %>
-<<%= tsec == :head ? 'th' : 'td' %> class="tableblock halign-<%= cell.attr :halign %> valign-<%= cell.attr :valign %>"#{attribute('colspan', 'cell.colspan')}#{attribute('rowspan', 'cell.rowspan')}<%
-        cell_content = ''
-        if tsec == :head
-          cell_content = cell.text
-        else
-          case cell.style
-          when :asciidoc
-            cell_content = %(<div>\#{cell.content}</div>)
-          when :verse
-            cell_content = %(<div class="verse">\#{template.preserve_endlines(cell.text, self)}</div>)
-          when :literal
-            cell_content = %(<div class="literal"><pre>\#{template.preserve_endlines(cell.text, self)}</pre></div>)
-          when :header
-            cell.content.each do |text|
-              cell_content = %(\#{cell_content}<p class="tableblock header">\#{text}</p>)
-            end
-          else
-            cell.content.each do |text|
-              cell_content = %(\#{cell_content}<p class="tableblock">\#{text}</p>)
-            end
-          end
-        end %><%= (@document.attr? 'cellbgcolor') ? %( style="background-color:\#{@document.attr 'cellbgcolor'};") : nil
-        %>><%= cell_content %></<%= tsec == :head ? 'th' : 'td' %>><%
-      end %>
+row.each do |cell| %>
+<<%= tsec == :head ? 'th' : 'td' %><%= cell.colspan ? %( colspan="#{cell.colspan}") : nil %><%= cell.rowspan ? %( rowspan="#{cell.rowspan}") : nil %>><% 
+if tsec == :head %><%= cell.text %><% else %><% 
+case cell.attr('style', nil, false)
+when :asciidoc %><div><%= cell.content %></div><%
+else %><% cell.content.each do |text| %><p<%= attr?('role') ? %( class="#{attr 'role'}") : nil %>><%= text %></p><% end %><%
+end %><% end %></<%= tsec == :head ? 'th' : 'td' %>><%
+end %>
 </tr><%
-    end %>
+end %>
 </t<%= tsec %>><%
-  end
+end %><%
 end %>
 </table>
     EOS
