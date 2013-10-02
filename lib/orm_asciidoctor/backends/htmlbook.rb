@@ -634,29 +634,16 @@ end
 
 class BlockOlistTemplate < BaseTemplate
   def result(node)
-    result_buffer = []
-    id_attribute = node.id ? %( id="#{node.id}") : nil
-    classes = ['olist', node.style, node.role].compact
-    class_attribute = %( class="#{classes * ' '}")
-
-    result_buffer << %(<div#{id_attribute}#{class_attribute}>)
-    result_buffer << %(<div class="title">#{node.title}</div>) if node.title?
-
-    type_attribute = (keyword = node.list_marker_keyword) ? %( type="#{keyword}") : nil
-    start_attribute = (node.attr? 'start') ? %( start="#{node.attr 'start'}") : nil
-    result_buffer << %(<ol class="#{node.style}"#{type_attribute}#{start_attribute}>)
-
-    node.items.each do |item|
-      result_buffer << '<li>'
-      result_buffer << %(<p>#{item.text}</p>)
-      result_buffer << item.content if item.blocks?
-      result_buffer << '</li>'
-    end
-
-    result_buffer << '</ol>'
-    result_buffer << '</div>'
-
-    result_buffer * EOL
+    idatt = node.id ? %( id="#{node.id}") : nil
+    role = stratt(node, 'class', :role)
+    start = stratt(node, 'start', :start)
+    list = %(<ol#{idatt}#{role}#{start}>)
+    list += node.content.map { |item|
+      li = %(<li><p>#{item.text}</p>)
+      li += item.content if item.blocks?
+      li += %(</li>)
+    }.join("")
+    list += %(</ol>)
   end
 
   def template
