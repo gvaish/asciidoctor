@@ -548,13 +548,16 @@ end
 
 class BlockExampleTemplate < BaseTemplate
   def result(node)
-    id_attribute = node.id ? %( id="#{node.id}") : nil
-    title_element = node.title? ? %(<div class="title">#{node.captioned_title}</div>\n) : nil
+    idatt = node.id ? %( id="#{node.id}") : nil
+    lang = node.attr?('style', 'source', false) ? %( data-code-language="#{node.attr('language')}") : nil
+    role = stratt(node, 'class', :role)
+    caption_title = node.document.attributes["example-caption"]
+    caption_num = node.document.attributes["example-number"]
+    section_num = node.next_section_index += 1
 
-    %(<div#{id_attribute} class="#{!node.role? ? 'exampleblock' : ['exampleblock', node.role] * ' '}">
-#{title_element}<div class="content">
-#{node.content}
-</div>
+    %(<div#{idatt} data-type="example"#{role}>
+  <h5><span data-type="label">#{caption_title} #{section_num}-#{caption_num}.</span> #{node.title}</h5>
+  <pre#{lang}>#{node.content}</pre>
 </div>)
   end
 
@@ -853,37 +856,28 @@ end %>
 end
 
 class BlockImageTemplate < BaseTemplate
-  def image(target, alt, title, link, node)
-    align = (node.attr? 'align') ? (node.attr 'align') : nil
-    float = (node.attr? 'float') ? (node.attr 'float') : nil 
-    if align || float
-      styles = [align ? %(text-align: #{align}) : nil, float ? %(float: #{float}) : nil].compact
-      style_attribute = %( style="#{styles * ';'}")
-    else
-      style_attribute = nil
-    end
-
-    width_attribute = (node.attr? 'width') ? %( width="#{node.attr 'width'}") : nil
-    height_attribute = (node.attr? 'height') ? %( height="#{node.attr 'height'}") : nil
-
-    img_element = %(<img src="#{node.image_uri target}" alt="#{alt}"#{width_attribute}#{height_attribute}>)
-    if link
-      img_element = %(<a class="image" href="#{link}">#{img_element}</a>)
-    end
-    id_attribute = node.id ? %( id="#{node.id}") : nil
-    classes = ['imageblock', node.style, node.role].compact
-    class_attribute = %( class="#{classes * ' '}")
-    title_element = title ? %(\n<div class="title">#{title}</div>) : nil
-
-    %(<div#{id_attribute}#{class_attribute}#{style_attribute}>
-<div class="content">
-#{img_element}
-</div>#{title_element}
-</div>)
-  end
 
   def result(node)
-    image(node.attr('target'), node.attr('alt'), node.title? ? node.captioned_title : nil, node.attr('link'), node)
+    
+    idatt = node.id? ? %( id=#{node.id}) : nil
+    role = stratt(node, 'class', :role)
+    alt = stratt(node, 'alt', :alt)
+    width = stratt(node, 'width', :width)
+    caption_title = node.document.attributes["figure-caption"]
+    caption_num = node.document.attributes["figure-number"]
+    section_num = node.next_section_index += 1
+
+    img = %(<figure#{idatt}#{role}>
+  <img src="#{image_uri(node.attr('target'))}"#{alt}#{width} />)
+
+    if node.title?
+      img += %(<figcaption><span data-type="label">#{caption_title} #{section_num}-#{caption_num}.</span> #{node.title}</figcaption>)
+    else
+      img += %(<figcaption/>)
+    end
+
+    img += %(</figure>)
+    img
   end
 
   def template
@@ -1089,12 +1083,15 @@ class InlineImageTemplate < BaseTemplate
 
   def result(node)
     extra_class = node.attr?('role') ? %( #{node.attr('role')}) : nil
+    width = stratt(node, 'width', :width)
+    height = stratt(node, 'height', :height)
+
     img = %(<span class="image#{extra_class}">)
 
     if node.attr? 'link'
       img += %(<a class="image" href="#{node.attr('link')}">)
     end
-    img += %(<img src="<%= image_uri(@target) %>" alt="<%= attr 'alt' %><%= attr?('width') ? %( width="#{attr 'width'}") : nil %><%= attr?('height') ? %( height="#{attr 'height'}") : nil %>"/>)
+    img += %(<img src="#{image_uri(@target)}" alt="#{width}#{height}"/>)
 
     if node.attr? 'link'
       img += "</a>"
@@ -1125,25 +1122,22 @@ class InlineFootnoteTemplate < BaseTemplate
   end
 end
 
-#class InlineIndextermTemplate < BaseTemplate
-#  def result(node)
-#    node.type == :visible ? node.text : ''
-#  end
-#
-#  def template
-#    :invoke_result
-#  end
-#end
-
 class InlineIndextermTemplate < BaseTemplate
+  def result(node)
+    terms = node.attr(:terms).map { |term| term.gsub("\"", "") }
+    numterms = terms.size
+    index = ""
+    if numterms > 2
+      index += %(<a data-type="indexterm" data-primary="#{terms[0]}" data-secondary="#{terms[1]}" data-tertiary="#{terms[2]}"></a>)
+    end
+    if numterms > 1
+      index += %(<a data-type="indexterm" data-primary="#{terms[-2]}" data-secondary="#{terms[-1]}"></a>)
+    end
+    index += %(<a data-type="indexterm" data-primary="#{terms[-1]}"></a>)
+  end
+
   def template
-    @template ||= @eruby.new <<-EOS
-<%#encoding:UTF-8%><% terms = (attr :terms); numterms = terms.size %><%
-if numterms > 2 %><a data-type="indexterm" data-primary="<%= terms[0] %>" data-secondary="<%= terms[1] %>" data-tertiary="<%= terms[2] %>"></a>
-<% end %><%
-if numterms > 1 %><a data-type="indexterm" data-primary="<%= terms[-2] %>" data-secondary="<%= terms[-1] %>"></a>
-<% end %><a data-type="indexterm" data-primary="<%= terms[-1] %>"></a>
-    EOS
+    :invoke_result
   end
 end
 
