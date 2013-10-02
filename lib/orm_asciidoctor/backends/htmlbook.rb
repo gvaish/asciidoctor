@@ -764,7 +764,7 @@ end
 class InlineLatexmathTemplate < BaseTemplate
   def template
     @template ||= @eruby.new <<-EOS
-<%#encoding:UTF-8%><span data-type="tex"><%= %(#{text}) %></span>
+<%#encoding:UTF-8%><span data-type="tex"><%= text %></span>
     EOS
   end
 end
